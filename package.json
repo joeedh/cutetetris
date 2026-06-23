@@ -1,0 +1,31 @@
+{
+  "name": "tetromochi",
+  "version": "0.1.0",
+  "description": "Tetromochi — the cuddliest block puzzle (TypeScript app)",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "node scripts/serve.mjs",
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsgo --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "check": "pnpm typecheck && pnpm lint && prettier --check ."
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "@typescript/native-preview"
+    ]
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@pathtx/prettier": "3.3.0-dev",
+    "@typescript/native-preview": "latest",
+    "esbuild": "^0.28.1",
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^10.1.8",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.62.0"
+  }
+}

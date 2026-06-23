@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>Tetromochi ♡</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Quicksand:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link href="./main.css" rel="stylesheet" />
+  </head>
+  <body>
+    <div class="sky" id="sky"></div>
+
+    <div class="app">
+      <header class="top">
+        <div class="wordmark">
+          <h1>Tetromochi ♡</h1>
+          <span class="sub">the cuddliest block puzzle</span>
+        </div>
+        <div class="iconbtns">
+          <button class="ibtn" id="muteBtn" title="Sound">🔊</button>
+          <button class="ibtn" id="pauseBtn" title="Pause">⏸</button>
+        </div>
+      </header>
+
+      <div class="statbar">
+        <div class="stat">
+          <div class="k">Score</div>
+          <div class="v" id="score">0</div>
+        </div>
+        <div class="stat">
+          <div class="k">Lines</div>
+          <div class="v" id="lines">0</div>
+        </div>
+        <div class="stat">
+          <div class="k">Level</div>
+          <div class="v" id="level">1</div>
+        </div>
+        <div class="stat next">
+          <div class="k">Next</div>
+          <canvas id="nextCanvas" width="105" height="75"></canvas>
+        </div>
+      </div>
+
+      <div class="stage">
+        <canvas id="mascot" width="105" height="105"></canvas>
+        <div class="board-frame">
+          <canvas id="board" width="375" height="750"></canvas>
+        </div>
+        <div class="overlay show" id="overlay">
+          <div class="big" id="ovTitle">ready? ♡</div>
+          <div class="small" id="ovText">
+            stack the little mochi, fill a row, and watch everyone cheer!
+          </div>
+          <div class="score-final" id="ovScore" style="display: none"></div>
+          <button class="play" id="playBtn">play ♪</button>
+        </div>
+      </div>
+
+      <div class="pad">
+        <button class="cbtn" id="bLeft">◀<span class="lab">left</span></button>
+        <button class="cbtn rotate" id="bRotate">⟳<span class="lab">spin</span></button>
+        <button class="cbtn" id="bRight">▶<span class="lab">right</span></button>
+        <button class="cbtn drop" id="bDrop">⤓<span class="lab">drop</span></button>
+      </div>
+      <div class="hint">← → move · ↑ / Z spin · ↓ soft drop · space hard drop · P pause</div>
+    </div>
+
+    <script src="./main.js"></script>
+  </body>
+</html>
