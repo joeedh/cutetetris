@@ -15,6 +15,8 @@ TypeScript app under `src/`.
 pnpm install        # install deps (pnpm is the package manager)
 pnpm dev            # esbuild watch + serve at http://localhost:8000/
 pnpm build          # minified bundle → dist/ (js, css, copied index.html)
+pnpm nwjs           # build (unminified) → dist/, then launch as a desktop app in NW.js
+pnpm shot           # drive the NW.js app over CDP and save a PNG (see scripts/screenshot.mjs)
 pnpm typecheck      # tsgo --noEmit  (native TS compiler, @typescript/native-preview)
 pnpm lint           # eslint .
 pnpm format         # prettier --write .   (uses the @pathtx/prettier fork)
@@ -24,6 +26,23 @@ pnpm check          # typecheck + lint + prettier --check   (run this before fin
 Toolchain is deliberate: **pnpm**, **tsgo** (not `tsc`) for typecheck, **esbuild** for
 bundling+serving, **ESLint** flat config with `typescript-eslint`, and the **`@pathtx/prettier`**
 fork (it ships the `prettier` bin, so `node_modules/.bin/prettier` is the fork).
+
+**Desktop (NW.js):** `pnpm nwjs` (`scripts/nwjs.mjs`) bundles into `dist/`, writes an NW.js
+manifest to `dist/package.json` (entry `index.html` + window size/title), then launches the
+`nw` binary against `dist/`. The IIFE bundle + classic `<script>` that make `file://` work also
+make NW.js work — no separate entry point needed. The `nw` dep is the **SDK** flavor (DevTools);
+its install script must download the runtime, so `nw` is listed in `pnpm.onlyBuiltDependencies`.
+Set `NWJS_CDP_PORT=<port>` before `pnpm nwjs` to also expose the CDP/DevTools endpoint.
+Shared build/launch lives in `scripts/lib/app.mjs`.
+
+**CDP screenshots / driving:** `scripts/lib/cdp.mjs` is a tiny dependency-free Chrome DevTools
+Protocol client (built on Node's global `fetch` + `WebSocket`). `scripts/screenshot.mjs` (= `pnpm
+shot`) launches NW.js with `--remote-debugging-port`, attaches, optionally runs page JS, then
+captures `Page.captureScreenshot`. Flags: `--out <path>` (default `screenshots/tetromochi.png`),
+`--port`, `--wait <ms>`, `--eval <js>`, `--attach` (use a running instance), `--keep`. Drive
+gameplay with synthetic events — the input layer reads `e.code` off `document` keydown, e.g.
+`--eval "document.dispatchEvent(new KeyboardEvent('keydown',{code:'ArrowLeft'}))"`; start the game
+with `--eval "document.getElementById('playBtn').click()"`. `screenshots/` is gitignored.
 
 ## Architecture (`src/`)
 

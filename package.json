@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "node scripts/serve.mjs",
     "build": "node scripts/build.mjs",
+    "nwjs": "node scripts/nwjs.mjs",
+    "shot": "node scripts/screenshot.mjs",
     "typecheck": "tsgo --noEmit",
     "lint": "eslint .",
     "format": "prettier --write .",
@@ -15,7 +17,8 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild",
-      "@typescript/native-preview"
+      "@typescript/native-preview",
+      "nw"
     ]
   },
   "devDependencies": {
@@ -25,6 +28,7 @@
     "esbuild": "^0.28.1",
     "eslint": "^9.0.0",
     "eslint-config-prettier": "^10.1.8",
+    "nw": "0.112.0-sdk",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.62.0"
   }
