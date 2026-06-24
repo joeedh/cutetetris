@@ -76,6 +76,29 @@ export function spawnClearFx(game: Game, rows: number[]): void {
     }
 }
 
+/** A little spat between the cells at (x,y) and (x+1,y): an anger mark plus a few red sparks. */
+export function addBickerFx(game: Game, x: number, y: number): void {
+  const px = (x + 1) * CELL;
+  const py = y * CELL + CELL * 0.3;
+  game.popups.push({ text: '💢', color: '#ff7a7a', scale: 0.55, x: px, y: py, life: 0.85, t: 0 });
+  if (reduceMotion) return;
+  for (let i = 0; i < 4; i++)
+    game.particles.push({
+      x: px,
+      y: y * CELL + CELL / 2,
+      vx: (Math.random() - 0.5) * 1.8,
+      vy: -(0.3 + Math.random() * 0.9),
+      g: 0.04,
+      life: 1,
+      decay: 0.03,
+      size: 3 + Math.random() * 3,
+      rot: Math.random() * 6.28,
+      vr: (Math.random() - 0.5) * 0.4,
+      kind: 'star',
+      color: '#ffb0b0',
+    });
+}
+
 export function burstHearts(game: Game): void {
   if (reduceMotion) return;
   for (let i = 0; i < 26; i++)

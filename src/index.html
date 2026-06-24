@@ -20,9 +20,12 @@
 
     <div class="app">
       <header class="top">
-        <div class="wordmark">
-          <h1>Tetromochi ♡</h1>
-          <span class="sub">the cuddliest block puzzle</span>
+        <div class="brand">
+          <div class="logo" aria-hidden="true"></div>
+          <div class="wordmark">
+            <h1>Tetromochi ♡</h1>
+            <span class="sub">the cuddliest block puzzle</span>
+          </div>
         </div>
         <div class="iconbtns">
           <button class="ibtn" id="muteBtn" title="Sound">🔊</button>
@@ -53,8 +56,13 @@
         <canvas id="mascot" width="105" height="105"></canvas>
         <div class="board-frame">
           <canvas id="board" width="375" height="750"></canvas>
+          <div class="corner tl" aria-hidden="true"></div>
+          <div class="corner tr" aria-hidden="true"></div>
+          <div class="corner bl" aria-hidden="true"></div>
+          <div class="corner br" aria-hidden="true"></div>
         </div>
         <div class="overlay show" id="overlay">
+          <div class="ovmascot hello" id="ovMascot" aria-hidden="true"></div>
           <div class="big" id="ovTitle">ready? ♡</div>
           <div class="small" id="ovText">
             stack the little mochi, fill a row, and watch everyone cheer!

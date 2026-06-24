@@ -6,6 +6,7 @@ export class Ui {
   private linesEl = el('lines');
   private levelEl = el('level');
   private overlay = el('overlay');
+  private ovMascot = el('ovMascot');
   private ovTitle = el('ovTitle');
   private ovText = el('ovText');
   private ovScore = el('ovScore');
@@ -18,7 +19,17 @@ export class Ui {
     this.levelEl.textContent = String(level);
   }
 
-  showOverlay(title: string, text: string, scoreLine?: string, playLabel?: string): void {
+  showOverlay(
+    title: string,
+    text: string,
+    scoreLine?: string,
+    playLabel?: string,
+    mascot?: 'hello' | 'sleep' | 'snug',
+  ): void {
+    if (mascot) {
+      this.ovMascot.classList.remove('hello', 'sleep', 'snug');
+      this.ovMascot.classList.add(mascot);
+    }
     this.ovTitle.textContent = title;
     this.ovText.textContent = text;
     if (scoreLine) {

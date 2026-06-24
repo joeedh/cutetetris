@@ -1,3 +1,5 @@
+import { TYPE_BY_COLOR } from './constants.ts';
+import { blockFrame } from './sprites.ts';
 import type { BlockOpts } from './types.ts';
 
 const WHITE: readonly [number, number, number] = [255, 255, 255];
@@ -98,6 +100,21 @@ export function drawBlock(
   const bs = size - m * 2;
   const cx = px + size / 2;
   const cy = py + size / 2;
+
+  // Prefer the watercolor sprite for this piece/expression; fall back to procedural drawing
+  // until the sheets finish loading (or if the color has no matching piece type).
+  const type = TYPE_BY_COLOR.get(color);
+  const frame = type ? blockFrame(type, face) : null;
+  if (frame) {
+    c.save();
+    c.globalAlpha = alpha;
+    c.translate(cx, cy);
+    c.scale(sx, sy);
+    c.translate(-cx, -cy);
+    c.drawImage(frame, px, py, size, size);
+    c.restore();
+    return;
+  }
 
   c.save();
   c.globalAlpha = alpha;

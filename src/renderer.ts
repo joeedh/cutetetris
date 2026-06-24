@@ -135,8 +135,15 @@ export class Renderer {
         } else {
           const s = settleScale(now - cell.settle);
           const br = 1 + Math.sin(now * 0.0022 + (x * 0.6 + y * 0.4)) * 0.016;
-          const face: Face = game.dangerNow && y < 7 ? 'worried' : blinking ? 'blink' : 'calm';
-          drawBlock(ctx, x * CELL, y * CELL, CELL, cell.color, {
+          let face: Face;
+          let dx = 0;
+          if (cell.expr && cell.exprUntil && now < cell.exprUntil) {
+            face = cell.expr;
+            if (face === 'bicker') dx = Math.sin(now * 0.045 + x * 1.7 + y) * 1.6;
+          } else {
+            face = game.dangerNow && y < 7 ? 'worried' : blinking ? 'blink' : 'calm';
+          }
+          drawBlock(ctx, x * CELL + dx, y * CELL, CELL, cell.color, {
             face,
             glance,
             scaleX: s.sx * br,

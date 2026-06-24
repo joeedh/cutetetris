@@ -1,3 +1,19 @@
+import bicker1 from './assets/sfx/bicker1.ogg';
+import bicker2 from './assets/sfx/bicker2.ogg';
+import bicker3 from './assets/sfx/bicker3.ogg';
+import bicker4 from './assets/sfx/bicker4.ogg';
+import celebrate1 from './assets/sfx/celebrate1.ogg';
+import celebrate2 from './assets/sfx/celebrate2.ogg';
+import celebrate3 from './assets/sfx/celebrate3.ogg';
+import celebrate4 from './assets/sfx/celebrate4.ogg';
+
+export type ClipName = 'bicker' | 'celebrate';
+
+const CLIP_URLS: Record<ClipName, string[]> = {
+  bicker: [bicker1, bicker2, bicker3, bicker4],
+  celebrate: [celebrate1, celebrate2, celebrate3, celebrate4],
+};
+
 export type SfxName =
   | 'move'
   | 'rotate'
@@ -15,6 +31,7 @@ export type SfxName =
 export class AudioEngine {
   private actx: AudioContext | null = null;
   private master: GainNode | null = null;
+  private clips: Partial<Record<ClipName, HTMLAudioElement[]>> = {};
   muted = false;
 
   /** Create the audio graph. Must be called from a user gesture (browsers block autoplay). */
@@ -32,6 +49,31 @@ export class AudioEngine {
 
   resume(): void {
     if (this.actx && this.actx.state === 'suspended') void this.actx.resume();
+  }
+
+  /** Preload the voice clips (HTMLAudio works over file:// where fetch/decodeAudioData don't). */
+  initClips(): void {
+    if (Object.keys(this.clips).length) return;
+    for (const name of Object.keys(CLIP_URLS) as ClipName[]) {
+      this.clips[name] = CLIP_URLS[name].map((url) => {
+        const a = new Audio(url);
+        a.preload = 'auto';
+        return a;
+      });
+    }
+  }
+
+  /** Play a random variant of a voice clip, pitched up so the mochi sound tiny and cute. */
+  playClip(name: ClipName, volume = 0.5): void {
+    if (this.muted) return;
+    const variants = this.clips[name];
+    if (!variants || !variants.length) return;
+    const base = variants[(Math.random() * variants.length) | 0];
+    const a = base.cloneNode() as HTMLAudioElement;
+    a.preservesPitch = false;
+    a.playbackRate = 1.28 + Math.random() * 0.18;
+    a.volume = volume;
+    void a.play().catch(() => {});
   }
 
   toggleMute(): boolean {

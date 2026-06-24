@@ -10,7 +10,7 @@ import {
   rotate,
 } from './constants.ts';
 import { SevenBag } from './rng.ts';
-import { addPopup, burstHearts, initAmbient, spawnClearFx, updateFx } from './fx.ts';
+import { addBickerFx, addPopup, burstHearts, initAmbient, spawnClearFx, updateFx } from './fx.ts';
 import type { AudioEngine } from './audio.ts';
 import type { Ui } from './ui.ts';
 import type {
@@ -63,6 +63,7 @@ export class Game {
   bounce = 0;
   cheerUntil = 0;
   dangerNow = false;
+  nextBicker = 0;
 
   constructor(
     readonly audio: AudioEngine,
@@ -95,6 +96,7 @@ export class Game {
     this.clearInfo = null;
     this.softDrop = false;
     this.cheerUntil = 0;
+    this.nextBicker = performance.now() + 4000;
     initAmbient(this);
     this.bag = new SevenBag();
     this.nextQueue = [this.bag.next(), this.bag.next(), this.bag.next()];
@@ -300,6 +302,19 @@ export class Game {
     }
     this.dropInterval = Math.max(90, 800 - (this.level - 1) * 68);
     this.syncStats();
+    // the surviving blocks cheer for their friends who just cleared
+    const celebrateUntil = performance.now() + 1300;
+    let survivors = 0;
+    for (let y = 0; y < ROWS; y++)
+      for (let x = 0; x < COLS; x++) {
+        const c = this.grid[y][x];
+        if (c) {
+          c.expr = 'celebrate';
+          c.exprUntil = celebrateUntil;
+          survivors++;
+        }
+      }
+    if (survivors) this.audio.playClip('celebrate', 0.6);
     this.clearInfo = null;
     this.status = 'playing';
     this.spawn();
@@ -328,6 +343,7 @@ export class Game {
       'the mochi reached the top — they had lots of fun. play again?',
       'final score · ' + this.score,
       'play again ♪',
+      'snug',
     );
   }
 
@@ -339,6 +355,7 @@ export class Game {
         'your buddy is resting. tap resume when you’re ready.',
         undefined,
         'resume ♪',
+        'sleep',
       );
       this.ui.setPaused(true);
     } else if (this.status === 'paused') {
@@ -347,6 +364,44 @@ export class Game {
       this.ui.hideOverlay();
       this.ui.setPaused(false);
     }
+  }
+
+  /** Fraction of the board height the stack reaches, 0..1. Drives how often blocks bicker. */
+  private stackHeight(): number {
+    for (let y = 0; y < ROWS; y++) {
+      if (this.grid[y].some((c) => c)) return (ROWS - y) / ROWS;
+    }
+    return 0;
+  }
+
+  /** Occasionally make two neighbouring blocks bicker — more often as the stack grows taller. */
+  private updateBicker(now: number): void {
+    if (now < this.nextBicker) return;
+    const fill = this.stackHeight();
+    // ~7s between spats on an empty-ish board, down to ~0.7s when stacked high.
+    const gap = (7000 - 6300 * fill) * (0.6 + Math.random() * 0.8);
+    this.nextBicker = now + gap;
+
+    const pairs: Array<[number, number]> = [];
+    for (let y = 0; y < ROWS; y++)
+      for (let x = 0; x < COLS - 1; x++) {
+        if (this.grid[y][x] && this.grid[y][x + 1]) pairs.push([x, y]);
+      }
+    if (!pairs.length) return;
+    const [x, y] = pairs[(Math.random() * pairs.length) | 0];
+    const until = now + 1100;
+    const left = this.grid[y][x];
+    const right = this.grid[y][x + 1];
+    if (left) {
+      left.expr = 'bicker';
+      left.exprUntil = until;
+    }
+    if (right) {
+      right.expr = 'bicker';
+      right.exprUntil = until;
+    }
+    this.audio.playClip('bicker', 0.4);
+    addBickerFx(this, x, y);
   }
 
   /** Advance the simulation by one animation frame. `time` is the rAF timestamp. */
@@ -369,6 +424,7 @@ export class Game {
         this.audio.sfx('lock');
         this.lockPiece();
       }
+      this.updateBicker(time);
     } else if (this.status === 'clearing') {
       if (this.clearInfo && performance.now() - this.clearInfo.start >= CLEAR_DUR)
         this.resolveClear();

@@ -15,12 +15,15 @@ export interface Piece {
 export interface Cell {
   color: string;
   settle: number;
+  /** A transient expression (e.g. bicker/celebrate) shown until `exprUntil`, overriding the default. */
+  expr?: Face;
+  exprUntil?: number;
 }
 
 export type Grid = (Cell | null)[][];
 
 /** Expression drawn on a mochi block. */
-export type Face = 'calm' | 'happy' | 'blink' | 'worried' | 'none';
+export type Face = 'calm' | 'happy' | 'blink' | 'worried' | 'bicker' | 'celebrate' | 'none';
 
 /** Expression drawn on the rabbit mascot. */
 export type Mood = 'idle' | 'sleep' | 'sad' | 'cheer' | 'worried';

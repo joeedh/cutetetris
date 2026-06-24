@@ -30,6 +30,9 @@ export function buildOptions({ minify }) {
     sourcemap: true,
     minify,
     logLevel: 'info',
+    // Image/audio assets (CSS url() or JS import) are copied into dist/assets/ with hashed names.
+    loader: { '.png': 'file', '.ogg': 'file' },
+    assetNames: 'assets/[name]-[hash]',
     plugins: [copyStaticPlugin],
   };
 }

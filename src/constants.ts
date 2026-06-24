@@ -59,6 +59,11 @@ export const SHAPES: Record<PieceType, Matrix> = {
 
 export const TYPES: PieceType[] = ['I', 'O', 'T', 'S', 'Z', 'J', 'L'];
 
+/** Reverse lookup from a cell's color (hex) back to its piece type, for sprite selection. */
+export const TYPE_BY_COLOR: ReadonlyMap<string, PieceType> = new Map(
+  TYPES.map((t) => [COLORS[t], t]),
+);
+
 /** Rotate a square matrix 90° clockwise. */
 export function rotate(m: Matrix): Matrix {
   const n = m.length;

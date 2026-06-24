@@ -13,6 +13,7 @@ export function attachInput(game: Game, audio: AudioEngine): void {
   function startGame(): void {
     audio.init();
     audio.resume();
+    audio.initClips();
     game.newGame();
   }
 
