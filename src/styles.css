@@ -262,6 +262,7 @@ header.top {
   aspect-ratio: 1 / 2;
   border-radius: 16px;
   background: var(--board-bg);
+  touch-action: none;
 }
 
 .overlay {
