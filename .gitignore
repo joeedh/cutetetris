@@ -2,5 +2,7 @@ node_modules
 dist
 keys
 screenshots
+.sprite-cache
+*.png~
 *.log
 .DS_Store

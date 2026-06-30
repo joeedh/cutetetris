@@ -4,7 +4,7 @@ import { el } from './dom.ts';
 import { Game } from './game.ts';
 import { attachInput } from './input.ts';
 import { Renderer } from './renderer.ts';
-import { loadSprites } from './sprites.ts';
+import { attachSpriteSelect } from './sprite-select.ts';
 import { Ui } from './ui.ts';
 
 function makeClouds(): void {
@@ -24,7 +24,7 @@ function makeClouds(): void {
 }
 
 makeClouds();
-loadSprites();
+attachSpriteSelect();
 
 const audio = new AudioEngine();
 const ui = new Ui();

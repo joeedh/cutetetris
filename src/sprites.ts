@@ -1,26 +1,10 @@
 import { TYPES } from './constants.ts';
+import { DEFAULT_SET_ID, spriteSet } from './sprite-sets.ts';
 import type { Face, PieceType } from './types.ts';
-import iSheet from './assets/blocks/I.png';
-import oSheet from './assets/blocks/O.png';
-import tSheet from './assets/blocks/T.png';
-import sSheet from './assets/blocks/S.png';
-import zSheet from './assets/blocks/Z.png';
-import jSheet from './assets/blocks/J.png';
-import lSheet from './assets/blocks/L.png';
 
 /** Each block sheet is a horizontal strip of these expression frames, in this order. */
 const FACE_ORDER: Face[] = ['calm', 'blink', 'happy', 'worried', 'bicker', 'celebrate'];
 const FRAME_COUNT = FACE_ORDER.length;
-
-const SHEETS: Record<PieceType, string> = {
-  I: iSheet,
-  O: oSheet,
-  T: tSheet,
-  S: sSheet,
-  Z: zSheet,
-  J: jSheet,
-  L: lSheet,
-};
 
 const FACE_INDEX: Record<Face, number> = {
   calm: 0,
@@ -32,34 +16,63 @@ const FACE_INDEX: Record<Face, number> = {
   none: 0,
 };
 
-const frames: Partial<Record<PieceType, HTMLCanvasElement[]>> = {};
+/** Sliced frame canvases, keyed by set id then piece type. Populated lazily as sets load. */
+const frames: Record<string, Partial<Record<PieceType, HTMLCanvasElement[]>>> = {};
+const loaded = new Set<string>();
+let activeSetId = DEFAULT_SET_ID;
 
-/** Load every block sheet and slice it into per-expression frame canvases. */
-export function loadSprites(): void {
+/** Slice a loaded sheet image into `FRAME_COUNT` per-expression frame canvases. */
+function sliceSheet(img: HTMLImageElement): HTMLCanvasElement[] | null {
+  const fw = img.width / FRAME_COUNT;
+  const fh = img.height;
+  const arr: HTMLCanvasElement[] = [];
+  for (let i = 0; i < FRAME_COUNT; i++) {
+    const cv = document.createElement('canvas');
+    cv.width = fw;
+    cv.height = fh;
+    const cx = cv.getContext('2d');
+    if (!cx) return null;
+    cx.drawImage(img, i * fw, 0, fw, fh, 0, 0, fw, fh);
+    arr.push(cv);
+  }
+  return arr;
+}
+
+/** Load (once) every sheet in a sprite set and slice it into per-expression frame canvases. */
+export function loadSpriteSet(id: string): void {
+  if (loaded.has(id)) return;
+  const set = spriteSet(id);
+  if (!set) return;
+  loaded.add(id);
+  const store: Partial<Record<PieceType, HTMLCanvasElement[]>> = (frames[id] ??= {});
   for (const type of TYPES) {
+    const src = set.sheets[type];
+    if (!src) continue;
     const img = new Image();
     img.onload = () => {
-      const fw = img.width / FRAME_COUNT;
-      const fh = img.height;
-      const arr: HTMLCanvasElement[] = [];
-      for (let i = 0; i < FRAME_COUNT; i++) {
-        const cv = document.createElement('canvas');
-        cv.width = fw;
-        cv.height = fh;
-        const cx = cv.getContext('2d');
-        if (!cx) return;
-        cx.drawImage(img, i * fw, 0, fw, fh, 0, 0, fw, fh);
-        arr.push(cv);
-      }
-      frames[type] = arr;
+      const sliced = sliceSheet(img);
+      if (sliced) store[type] = sliced;
     };
-    img.src = SHEETS[type];
+    img.src = src;
   }
 }
 
-/** The frame canvas for a piece's expression, or `null` if its sheet hasn't loaded yet. */
+/** Switch the active skin, loading its sheets if they haven't been loaded yet. */
+export function setActiveSpriteSet(id: string): void {
+  activeSetId = spriteSet(id) ? id : DEFAULT_SET_ID;
+  loadSpriteSet(activeSetId);
+}
+
+export function getActiveSpriteSet(): string {
+  return activeSetId;
+}
+
+/**
+ * The frame canvas for a piece's expression in the active set, or `null` if it hasn't loaded
+ * (or the active set has no sheet for this piece) — callers then fall back to procedural drawing.
+ */
 export function blockFrame(type: PieceType, face: Face): HTMLCanvasElement | null {
-  const arr = frames[type];
+  const arr = frames[activeSetId]?.[type];
   if (!arr) return null;
   return arr[FACE_INDEX[face]] ?? arr[0] ?? null;
 }
