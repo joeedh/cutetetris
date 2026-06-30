@@ -31,18 +31,26 @@ to 128px frames, (5) assembles a `768x128` strip, and (6) quantizes it to a smal
 `src/assets/blocks/<set>/<piece>.png`.
 
 It self-bootstraps `sharp` into `.sprite-cache/` on first run (sharp is **not** a repo dependency;
-`.sprite-cache/` is gitignored). It reads the Gemini key from `keys/gemini.txt` and the set's
-theme from `src/assets/blocks/<set>/set.json`.
+`.sprite-cache/` is gitignored). It reads the Gemini key from `keys/gemini.txt` and the per-piece
+theme (`themes.<piece>`, else `theme`) from `src/assets/blocks/<set>/set.json`.
+
+By default it generates **text-to-image with a blank 6-cell layout template** (a magenta canvas
+with 6 cream placeholder cells) so the model emits a 6:1 strip without any subject to copy. The
+model is stochastic about honoring the strip layout, so the script **auto-retries** (`--retries`,
+default 5) until the output is a ~6:1 strip.
 
 ### Examples
 
 ```bash
-# Generate the Z piece for the animals-3d skin (uses set.json's theme + any existing
-# sheet in the set as a style reference for image-to-image consistency):
-node scripts/gen-sprite-sheet.mjs animals-3d Z
+# Generate the L piece for the animals-3d skin (theme comes from set.json's themes.L):
+node scripts/gen-sprite-sheet.mjs animals-3d L
 
 # Override the theme inline:
 node scripts/gen-sprite-sheet.mjs animals-3d L --theme "a cute 3D claymation red panda"
+
+# Some subjects (e.g. "frog") stubbornly render as a single square no matter how many template
+# retries — force the strip layout with an existing clean sheet as the reference instead:
+node scripts/gen-sprite-sheet.mjs animals-3d S --ref T --theme "a cute 3D claymation frog"
 
 # Re-process an already-downloaded raw/output PNG (no Gemini call) — e.g. to retune keying:
 node scripts/gen-sprite-sheet.mjs animals-3d Z --no-generate --threshold 80
@@ -50,14 +58,25 @@ node scripts/gen-sprite-sheet.mjs animals-3d Z --no-generate --threshold 80
 
 ### Useful options
 
-- `--theme "<text>"` — subject/style (default: `set.json` `theme`, else the set id).
+- `--theme "<text>"` — subject/style (default: `set.json` `themes.<piece>` → `theme` → set id).
 - `--prompt "<text>"` — full prompt override (skips the built-in prompt).
-- `--ref <piece>` — use that piece's existing sheet in the set as the image-to-image reference.
-  By default it picks any existing sheet in the set (style match), else the same piece from `blocks`.
+- `--ref <piece>` — use that piece's existing sheet (this set, else `blocks`) as an image-to-image
+  reference. Reliably forces the 6:1 layout, but **the reference subject can leak into a frame**
+  (usually the last) — preview and regenerate if so. Best when subjects are similar.
+- `--no-ref` — pure text-to-image, no template/reference. The model usually returns a single
+  square (not a strip), so this is rarely useful; prefer the default template.
+- `--retries <n>` — generation attempts to land a strip (default 5).
 - `--no-generate` — skip Gemini; re-process the existing PNG only.
 - `--key auto|alpha|chroma` — background removal mode (default `auto`, detected from the corners).
 - `--threshold <0-255>` — alpha-key cutoff for `alpha` mode (default: auto from the alpha histogram).
 - `--frame <px>` / `--pad <0-1>` / `--model <id>` / `--keep-raw`.
+
+### Picking the layout mode
+
+- **Default (template)** — best for a set of *different* subjects (no leak). Retries handle the
+  occasional square. A few subjects ("frog") never strip under the template; switch to `--ref`.
+- **`--ref <piece>`** — guarantees the 6:1 layout; use for same-subject sets or stubborn subjects,
+  and **always preview** for a leaked frame (vary `--ref` and regenerate until clean).
 
 ## Adding a brand-new set
 

@@ -8,7 +8,13 @@ import blocksZ from './assets/blocks/blocks/Z.png';
 import blocksJ from './assets/blocks/blocks/J.png';
 import blocksL from './assets/blocks/blocks/L.png';
 
+import animalsI from './assets/blocks/animals-3d/I.png';
+import animalsO from './assets/blocks/animals-3d/O.png';
+import animalsT from './assets/blocks/animals-3d/T.png';
+import animalsS from './assets/blocks/animals-3d/S.png';
 import animalsZ from './assets/blocks/animals-3d/Z.png';
+import animalsJ from './assets/blocks/animals-3d/J.png';
+import animalsL from './assets/blocks/animals-3d/L.png';
 
 /** A selectable skin: a named set of per-piece sprite sheets. */
 export interface SpriteSet {
@@ -31,7 +37,15 @@ export const SPRITE_SETS: readonly SpriteSet[] = [
   {
     id: 'animals-3d',
     label: 'Animals 3D',
-    sheets: { Z: animalsZ },
+    sheets: {
+      I: animalsI,
+      O: animalsO,
+      T: animalsT,
+      S: animalsS,
+      Z: animalsZ,
+      J: animalsJ,
+      L: animalsL,
+    },
   },
 ];
 

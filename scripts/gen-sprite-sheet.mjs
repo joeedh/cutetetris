@@ -12,11 +12,17 @@
 // 128px frames → assemble a 768x128 strip → quantize to a small palette PNG. The output is
 // written to src/assets/blocks/<set>/<piece>.png.
 //
+// By default it generates text-to-image with a blank 6-cell layout template (so the model emits a
+// 6:1 strip with no subject to copy) and retries until the output really is a strip.
+//
 // Options:
-//   --theme "<text>"     Theme/subject for the art (default: read from the set's set.json, else the set id).
+//   --theme "<text>"     Theme/subject (default: set.json `themes.<piece>` → `theme` → the set id).
 //   --prompt "<text>"    Full prompt override (skips the built-in prompt; --theme is ignored).
-//   --ref <piece>        Use this piece's existing sheet in the set as a style reference (image-to-image).
-//                        Default: any existing sheet in the set, else the same piece in the `blocks` set.
+//   --ref <piece>        Use that piece's existing sheet (this set, else `blocks`) as an
+//                        image-to-image reference. Forces the 6:1 layout reliably, but the
+//                        reference subject can LEAK into a frame — preview and regenerate if so.
+//   --no-ref             Pure text-to-image, no template/reference (usually returns a single square).
+//   --retries <n>        Generation attempts to land a ~6:1 strip (default 5).
 //   --no-generate        Skip Gemini; re-process the existing raw/output PNG only (background key + resize).
 //   --key auto|alpha|chroma   Background removal mode (default: auto — detect from the image corners).
 //   --threshold <0-255>  Alpha-key cutoff (alpha mode). Default: auto-detected from the alpha histogram.
@@ -99,7 +105,7 @@ function readSetMeta() {
   }
 }
 const meta = readSetMeta();
-const theme = String(opt.theme ?? meta.theme ?? set);
+const theme = String(opt.theme ?? meta.themes?.[piece] ?? meta.theme ?? set);
 
 // ---- Gemini generation ---------------------------------------------------
 function pieceShapeHint(p) {
@@ -132,18 +138,31 @@ function buildPrompt() {
   ].join(' ');
 }
 
+/** An explicit `--ref <piece>` style-reference sheet, if any (else null). */
 function refSheetPath() {
-  if (typeof opt.ref === 'string') {
-    const p = resolve(setDir, `${opt.ref}.png`);
-    if (existsSync(p)) return p;
-  }
-  // any existing sheet in this set (style match), else the same piece from the default set
-  for (const f of FACE_ORDER.length ? [piece, 'I', 'O', 'T', 'S', 'Z', 'J', 'L'] : []) {
-    const p = resolve(setDir, `${f}.png`);
-    if (existsSync(p) && p !== outPath) return p;
-  }
-  const fallback = resolve(BLOCKS_DIR, 'blocks', `${piece}.png`);
+  if (opt['no-ref'] || typeof opt.ref !== 'string') return null;
+  const p = resolve(setDir, `${opt.ref}.png`);
+  if (existsSync(p)) return p;
+  const fallback = resolve(BLOCKS_DIR, 'blocks', `${opt.ref}.png`);
   return existsSync(fallback) ? fallback : null;
+}
+
+/**
+ * A blank layout template: magenta with `FRAME_COUNT` cream placeholder cells. Conditions the
+ * model to emit a 6:1 strip of evenly-spaced frames WITHOUT giving it any subject to copy (a real
+ * reference sheet tends to leak its subject into a frame). This is the default when no `--ref`.
+ */
+function buildTemplate() {
+  const cell = 320;
+  const W = cell * FRAME_COUNT;
+  const H = cell;
+  const cells = Array.from({ length: FRAME_COUNT }, (_, i) => {
+    const pad = cell * 0.1;
+    const w = cell - pad * 2;
+    return `<rect x="${i * cell + pad}" y="${pad}" width="${w}" height="${w}" rx="${w * 0.18}" fill="#f3ece2"/>`;
+  }).join('');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="#FF00FF"/>${cells}</svg>`;
+  return sharp(Buffer.from(svg)).png().toBuffer();
 }
 
 async function generate() {
@@ -151,28 +170,54 @@ async function generate() {
   const apiKey = readFileSync(keyPath, 'utf8').trim();
   const parts = [{ text: buildPrompt() }];
   const ref = refSheetPath();
+  let mode = 'text-to-image';
   if (ref) {
-    const b64 = readFileSync(ref).toString('base64');
-    parts.push({ inline_data: { mime_type: 'image/png', data: b64 } });
+    mode = 'image-to-image';
     parts.unshift({
-      text: 'Match the art style, framing and frame layout of the reference image that follows, but with the new theme/subject described above.',
+      text: 'Match the art style, framing and frame layout of the reference image that follows, but with the new theme/subject described above. Replace the subject in EVERY frame — do not copy the reference subject into any frame.',
+    });
+    parts.push({
+      inline_data: { mime_type: 'image/png', data: readFileSync(ref).toString('base64') },
+    });
+  } else if (!opt['no-ref']) {
+    mode = 'template';
+    parts.unshift({
+      text: 'The image that follows is a BLANK LAYOUT TEMPLATE: a magenta canvas with 6 empty cream cells in a row. Paint the new subject into each of the 6 cells (one expression per cell, left to right) and keep the magenta background. Do not copy anything else from the template.',
+    });
+    parts.push({
+      inline_data: { mime_type: 'image/png', data: (await buildTemplate()).toString('base64') },
     });
   }
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-  console.log(`generating ${set}/${piece} with ${model}${ref ? ' (image-to-image)' : ''}…`);
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ contents: [{ parts }] }),
-  });
-  if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
-  const json = await res.json();
-  const cand = json.candidates?.[0];
-  const img = cand?.content?.parts?.find((p) => p.inlineData || p.inline_data);
-  const data = img?.inlineData?.data ?? img?.inline_data?.data;
-  if (!data) throw new Error(`No image in response (finishReason=${cand?.finishReason}).`);
-  writeFileSync(rawPath, Buffer.from(data, 'base64'));
-  console.log(`raw → ${rawPath}`);
+  // The model is stochastic about honoring the 6:1 strip layout; retry until it does.
+  const maxAttempts = Math.max(1, Number(opt.retries ?? 5));
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    console.log(
+      `generating ${set}/${piece} with ${model} (${mode}, attempt ${attempt}/${maxAttempts})…`,
+    );
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts }] }),
+    });
+    if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
+    const json = await res.json();
+    const cand = json.candidates?.[0];
+    const img = cand?.content?.parts?.find((p) => p.inlineData || p.inline_data);
+    const data = img?.inlineData?.data ?? img?.inline_data?.data;
+    if (!data) throw new Error(`No image in response (finishReason=${cand?.finishReason}).`);
+    const buf = Buffer.from(data, 'base64');
+    const meta = await sharp(buf).metadata();
+    const aspect = meta.width / meta.height;
+    if (aspect >= FRAME_COUNT * 0.6 || attempt === maxAttempts) {
+      writeFileSync(rawPath, buf);
+      console.log(`raw → ${rawPath} (${meta.width}x${meta.height})`);
+      if (aspect < FRAME_COUNT * 0.6)
+        console.warn(`  warning: not a ${FRAME_COUNT}:1 strip; processing may fail.`);
+      break;
+    }
+    console.log(`  got ${meta.width}x${meta.height} (not a strip) — retrying…`);
+  }
   return rawPath;
 }
 
@@ -200,7 +245,15 @@ async function processSheet(srcPath) {
   const base = sharp(srcPath).ensureAlpha();
   const { data, info } = await base.raw().toBuffer({ resolveWithObject: true });
   const { width: W, height: H, channels: ch } = info;
-  const fw = Math.round(W / FRAME_COUNT);
+  const aspect = W / H;
+  if (aspect < FRAME_COUNT * 0.6) {
+    throw new Error(
+      `raw image is ${W}x${H} (aspect ${aspect.toFixed(2)}), not a ~${FRAME_COUNT}:1 strip — ` +
+        `the model didn't emit a 6-frame row. Re-run with a layout reference (the default template, ` +
+        `or --ref <piece>) rather than --no-ref.`,
+    );
+  }
+  const fw = Math.floor(W / FRAME_COUNT);
 
   // Decide keying mode from the corners.
   const corner = (x, y) => {
@@ -283,8 +336,9 @@ async function processSheet(srcPath) {
     .toBuffer();
   const tiles = [];
   for (let f = 0; f < FRAME_COUNT; f++) {
+    const exLeft = Math.min(f * fw + left, W - sq); // clamp so the last frame can't overrun width
     const tile = await sharp(rawKeyedPng)
-      .extract({ left: f * fw + left, top, width: sq, height: sq })
+      .extract({ left: exLeft, top, width: sq, height: sq })
       .resize(frameSize, frameSize, { fit: 'fill' })
       .png()
       .toBuffer();
