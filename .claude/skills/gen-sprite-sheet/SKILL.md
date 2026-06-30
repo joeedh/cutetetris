@@ -25,32 +25,30 @@ add sheets one at a time.
 node scripts/gen-sprite-sheet.mjs <set> <piece> [options]
 ```
 
-It (1) asks Gemini for a raw 6-frame strip on a flat keyable background, (2) keys the background
-out, (3) trims every frame to one **shared square** so the frames stay pixel-aligned, (4) resizes
-to 128px frames, (5) assembles a `768x128` strip, and (6) quantizes it to a small palette PNG at
-`src/assets/blocks/<set>/<piece>.png`.
+By default it uses a **per-frame editing** pipeline: (1) generate ONE base "calm" subject, (2)
+image-to-image edit ONLY its face for each of the other 5 expressions, (3) key the magenta
+background out of each, (4) trim every frame to one **shared square** so they stay aligned, (5)
+resize to 128px frames, (6) assemble a `768x128` strip, and (7) quantize to a small palette PNG at
+`src/assets/blocks/<set>/<piece>.png`. This **guarantees exactly 6 frames with an identical body**
+in the correct expression order — far more reliable than the single-shot strip modes below, which
+routinely yield 4–5 frames or leave coloured layout cells behind.
 
 It self-bootstraps `sharp` into `.sprite-cache/` on first run (sharp is **not** a repo dependency;
 `.sprite-cache/` is gitignored). It reads the Gemini key from `keys/gemini.txt` and the per-piece
-theme (`themes.<piece>`, else `theme`) from `src/assets/blocks/<set>/set.json`.
-
-By default it generates **text-to-image with a blank 6-cell layout template** (a magenta canvas
-with 6 cream placeholder cells) so the model emits a 6:1 strip without any subject to copy. The
-model is stochastic about honoring the strip layout, so the script **auto-retries** (`--retries`,
-default 5) until the output is a ~6:1 strip.
+theme (`themes.<piece>`, else `theme`) from `src/assets/blocks/<set>/set.json`. Per-frame mode
+makes 6 Gemini calls per sheet (1 base + 5 edits).
 
 ### Examples
 
 ```bash
-# Generate the L piece for the animals-3d skin (theme comes from set.json's themes.L):
+# Generate the L piece for the animals-3d skin (per-frame; theme from set.json's themes.L):
 node scripts/gen-sprite-sheet.mjs animals-3d L
 
 # Override the theme inline:
 node scripts/gen-sprite-sheet.mjs animals-3d L --theme "a cute 3D claymation red panda"
 
-# Some subjects (e.g. "frog") stubbornly render as a single square no matter how many template
-# retries — force the strip layout with an existing clean sheet as the reference instead:
-node scripts/gen-sprite-sheet.mjs animals-3d S --ref T --theme "a cute 3D claymation frog"
+# Single-shot strip instead of per-frame (1 call, less reliable — retries until it gets 6 frames):
+node scripts/gen-sprite-sheet.mjs animals-3d L --strip
 
 # Re-process an already-downloaded raw/output PNG (no Gemini call) — e.g. to retune keying:
 node scripts/gen-sprite-sheet.mjs animals-3d Z --no-generate --threshold 80
@@ -59,24 +57,24 @@ node scripts/gen-sprite-sheet.mjs animals-3d Z --no-generate --threshold 80
 ### Useful options
 
 - `--theme "<text>"` — subject/style (default: `set.json` `themes.<piece>` → `theme` → set id).
-- `--prompt "<text>"` — full prompt override (skips the built-in prompt).
-- `--ref <piece>` — use that piece's existing sheet (this set, else `blocks`) as an image-to-image
-  reference. Reliably forces the 6:1 layout, but **the reference subject can leak into a frame**
-  (usually the last) — preview and regenerate if so. Best when subjects are similar.
-- `--no-ref` — pure text-to-image, no template/reference. The model usually returns a single
-  square (not a strip), so this is rarely useful; prefer the default template.
-- `--retries <n>` — generation attempts to land a strip (default 5).
+- `--prompt "<text>"` — full prompt override (single-shot strip modes only).
+- `--strip` — single-shot strip generation with the blank green-cell layout template, instead of
+  per-frame. Retries until the model emits a ~6:1 strip with exactly 6 separable subjects.
+- `--ref <piece>` — single-shot strip using that piece's existing sheet (this set, else `blocks`)
+  as an image-to-image reference. **The reference subject can leak into a frame** — preview/redo.
+- `--no-ref` — single-shot pure text-to-image (usually returns one square; rarely useful).
+- `--retries <n>` — strip-mode attempts to land 6 frames (default 5).
 - `--no-generate` — skip Gemini; re-process the existing PNG only.
 - `--key auto|alpha|chroma` — background removal mode (default `auto`, detected from the corners).
 - `--threshold <0-255>` — alpha-key cutoff for `alpha` mode (default: auto from the alpha histogram).
 - `--frame <px>` / `--pad <0-1>` / `--model <id>` / `--keep-raw`.
 
-### Picking the layout mode
+### Picking the mode
 
-- **Default (template)** — best for a set of *different* subjects (no leak). Retries handle the
-  occasional square. A few subjects ("frog") never strip under the template; switch to `--ref`.
-- **`--ref <piece>`** — guarantees the 6:1 layout; use for same-subject sets or stubborn subjects,
-  and **always preview** for a leaked frame (vary `--ref` and regenerate until clean).
+- **Default (per-frame)** — use this. Exactly 6 frames, identical body, correct expression order.
+- **`--strip`** — one call per sheet, but the model often draws 4–5 frames or leaves coloured cells;
+  the generator retries on frame count, but you should still preview. Use only to save calls.
+- **`--ref <piece>`** — single-shot conditioned on a reference; can leak the reference subject.
 
 ## Adding a brand-new set
 

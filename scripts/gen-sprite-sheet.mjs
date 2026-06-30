@@ -12,17 +12,21 @@
 // 128px frames → assemble a 768x128 strip → quantize to a small palette PNG. The output is
 // written to src/assets/blocks/<set>/<piece>.png.
 //
-// By default it generates text-to-image with a blank 6-cell layout template (so the model emits a
-// 6:1 strip with no subject to copy) and retries until the output really is a strip.
+// By default it uses a per-frame editing pipeline: generate one base "calm" subject, then
+// image-to-image edit ONLY the face for each remaining expression. This guarantees exactly
+// FRAME_COUNT frames with an identical body, in order — unlike the single-shot strip modes, which
+// often yield 4-5 frames. Per-frame mode makes 6 Gemini calls per sheet (1 base + 5 edits).
 //
 // Options:
 //   --theme "<text>"     Theme/subject (default: set.json `themes.<piece>` → `theme` → the set id).
-//   --prompt "<text>"    Full prompt override (skips the built-in prompt; --theme is ignored).
-//   --ref <piece>        Use that piece's existing sheet (this set, else `blocks`) as an
-//                        image-to-image reference. Forces the 6:1 layout reliably, but the
-//                        reference subject can LEAK into a frame — preview and regenerate if so.
-//   --no-ref             Pure text-to-image, no template/reference (usually returns a single square).
-//   --retries <n>        Generation attempts to land a ~6:1 strip (default 5).
+//   --strip              Single-shot strip generation (blank green-cell template) instead of
+//                        per-frame; retries until the output is a ~6:1 strip with FRAME_COUNT subjects.
+//   --prompt "<text>"    Full prompt override (single-shot strip modes only).
+//   --ref <piece>        Single-shot strip conditioned on that piece's existing sheet (this set,
+//                        else `blocks`) as an image-to-image reference. The reference subject can
+//                        LEAK into a frame — preview and regenerate if so.
+//   --no-ref             Single-shot pure text-to-image (usually returns one square).
+//   --retries <n>        Strip-mode attempts to land FRAME_COUNT frames (default 5).
 //   --no-generate        Skip Gemini; re-process the existing raw/output PNG only (background key + resize).
 //   --key auto|alpha|chroma   Background removal mode (default: auto — detect from the image corners).
 //   --threshold <0-255>  Alpha-key cutoff (alpha mode). Default: auto-detected from the alpha histogram.
@@ -152,8 +156,8 @@ function refSheetPath() {
  * the model to emit a 6:1 strip of evenly-spaced frames WITHOUT giving it any subject to copy (a
  * real reference sheet tends to leak its subject into a frame). Both template colours (magenta +
  * green) are pure chroma absent from pastel subjects, so whatever the model leaves of them gets
- * keyed out cleanly — unlike a cream cell, which would survive as an opaque square. Default when
- * no `--ref`.
+ * keyed out cleanly — unlike a cream cell, which would survive as an opaque square. Used by the
+ * single-shot `--strip` mode (the default is the per-frame pipeline, which needs no template).
  */
 function buildTemplate() {
   const cell = 320;
@@ -168,58 +172,154 @@ function buildTemplate() {
   return sharp(Buffer.from(svg)).png().toBuffer();
 }
 
-async function generate() {
-  const keyPath = resolve(ROOT, 'keys/gemini.txt');
-  const apiKey = readFileSync(keyPath, 'utf8').trim();
-  const parts = [{ text: buildPrompt() }];
-  const ref = refSheetPath();
-  let mode = 'text-to-image';
-  if (ref) {
-    mode = 'image-to-image';
-    parts.unshift({
-      text: 'Match the art style, framing and frame layout of the reference image that follows, but with the new theme/subject described above. Replace the subject in EVERY frame — do not copy the reference subject into any frame.',
-    });
-    parts.push({
-      inline_data: { mime_type: 'image/png', data: readFileSync(ref).toString('base64') },
-    });
-  } else if (!opt['no-ref']) {
-    mode = 'template';
-    parts.unshift({
-      text: 'The image that follows is a BLANK LAYOUT TEMPLATE: a magenta canvas with 6 empty bright-green cells in a row. Paint the new subject into each of the 6 cells (one expression per cell, left to right). Leave everything that is not the subject as FLAT solid colour — the area around each subject pure magenta and any leftover cell area pure bright green — with no shadows, gradients or props, so the background can be removed. Do not copy anything else from the template.',
-    });
-    parts.push({
-      inline_data: { mime_type: 'image/png', data: (await buildTemplate()).toString('base64') },
-    });
-  }
+/** Per-expression face descriptions, in `FACE_ORDER`. Used by the per-frame editing pipeline. */
+const FACE_PROMPTS = {
+  calm: 'a calm, neutral, gently content face',
+  blink: 'eyes happily closed as if blinking, with a soft content smile',
+  happy: 'a big joyful open smile, eyes shut in happiness',
+  worried: 'a nervous, worried face: wide anxious eyes and a tiny blue sweat drop',
+  bicker: 'a grumpy, annoyed pout: furrowed brow and a small red anger-vein mark',
+  celebrate: 'an excited, celebrating face: star-shaped sparkly eyes and an open cheering mouth',
+};
+
+const BG_NOTE =
+  'Render on a SOLID FLAT pure-magenta #FF00FF background — one uniform colour, with no shadow, ' +
+  'gradient, props or extra objects — so the background can be cleanly removed.';
+
+/** POST `parts` to the image model and return the PNG buffer, retrying transient no-image replies. */
+async function callModel(parts, label) {
+  const apiKey = readFileSync(resolve(ROOT, 'keys/gemini.txt'), 'utf8').trim();
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-  // The model is stochastic about honoring the 6:1 strip layout; retry until it does.
-  const maxAttempts = Math.max(1, Number(opt.retries ?? 5));
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    console.log(
-      `generating ${set}/${piece} with ${model} (${mode}, attempt ${attempt}/${maxAttempts})…`,
-    );
+  for (let attempt = 1; attempt <= 4; attempt++) {
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ contents: [{ parts }] }),
     });
-    if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
+    if (!res.ok) {
+      if (attempt < 4 && res.status >= 500) continue;
+      throw new Error(`Gemini ${res.status}: ${await res.text()}`);
+    }
     const json = await res.json();
     const cand = json.candidates?.[0];
     const img = cand?.content?.parts?.find((p) => p.inlineData || p.inline_data);
     const data = img?.inlineData?.data ?? img?.inline_data?.data;
-    if (!data) throw new Error(`No image in response (finishReason=${cand?.finishReason}).`);
-    const buf = Buffer.from(data, 'base64');
-    const meta = await sharp(buf).metadata();
-    const aspect = meta.width / meta.height;
-    if (aspect >= FRAME_COUNT * 0.6 || attempt === maxAttempts) {
+    if (data) return Buffer.from(data, 'base64');
+    console.log(`  ${label}: no image (finishReason=${cand?.finishReason}) — retrying…`);
+  }
+  throw new Error(`No image for ${label} after retries.`);
+}
+
+/**
+ * Default pipeline: generate ONE base (calm) subject, then image-to-image edit ONLY its face for
+ * each remaining expression. This guarantees exactly FRAME_COUNT frames with an identical body on a
+ * clean magenta background — far more reliable than coaxing the model to draw a whole 6-frame strip
+ * in one shot (which routinely yields 4-5 frames or leaves coloured layout cells behind). The 6
+ * frames are laid out on a magenta strip so the existing key/detect/crop pipeline finishes the job.
+ */
+async function generateFrames() {
+  console.log(`generating ${set}/${piece}: base (calm) frame…`);
+  const base = await callModel(
+    [
+      {
+        text: `${theme}. A single cute character, centred, facing forward, full body, ${FACE_PROMPTS.calm}. ${BG_NOTE} Square image.`,
+      },
+    ],
+    'calm',
+  );
+  const frames = [base];
+  for (const face of FACE_ORDER.slice(1)) {
+    console.log(`  editing face → ${face}…`);
+    const f = await callModel(
+      [
+        {
+          text: `Edit the attached character image. Keep the SAME subject — identical body, pose, size, colours, position and framing — and change ONLY the facial expression to: ${FACE_PROMPTS[face]}. ${BG_NOTE}`,
+        },
+        { inline_data: { mime_type: 'image/png', data: base.toString('base64') } },
+      ],
+      face,
+    );
+    frames.push(f);
+  }
+  // Lay the frames out on a magenta strip (each contained in a square cell), so the key/detect/crop
+  // pipeline sees FRAME_COUNT cleanly-separated subjects on a pure-magenta background.
+  const cell = 512;
+  const mag = { r: 255, g: 0, b: 255, alpha: 1 };
+  const cells = await Promise.all(
+    frames.map((b) =>
+      sharp(b)
+        .resize(cell, cell, { fit: 'contain', background: mag })
+        .flatten({ background: mag })
+        .png()
+        .toBuffer(),
+    ),
+  );
+  const strip = await sharp({
+    create: { width: cell * FRAME_COUNT, height: cell, channels: 4, background: mag },
+  })
+    .composite(cells.map((b, i) => ({ input: b, left: i * cell, top: 0 })))
+    .png()
+    .toBuffer();
+  writeFileSync(rawPath, strip);
+  console.log(`raw → ${rawPath} (${cell * FRAME_COUNT}x${cell}, ${FRAME_COUNT} frames)`);
+  return rawPath;
+}
+
+/**
+ * Single-shot strip generation (`--strip`, or implied by `--ref`/`--no-ref`): asks the model for
+ * the whole 6-frame row at once, conditioned by a layout template or a reference sheet, retrying
+ * until the output is a ~6:1 strip containing FRAME_COUNT separate subjects. Less reliable than the
+ * per-frame default, but one call per accepted result.
+ */
+async function generate() {
+  const baseParts = [{ text: buildPrompt() }];
+  const ref = refSheetPath();
+  let mode = 'text-to-image';
+  if (ref) {
+    mode = 'image-to-image';
+    baseParts.unshift({
+      text: 'Match the art style, framing and frame layout of the reference image that follows, but with the new theme/subject described above. Replace the subject in EVERY frame — do not copy the reference subject into any frame.',
+    });
+    baseParts.push({
+      inline_data: { mime_type: 'image/png', data: readFileSync(ref).toString('base64') },
+    });
+  } else if (!opt['no-ref']) {
+    mode = 'template';
+    baseParts.unshift({
+      text: 'The image that follows is a BLANK LAYOUT TEMPLATE: a magenta canvas with 6 empty bright-green cells in a row. Paint the new subject into each of the 6 cells (one expression per cell, left to right). Leave everything that is not the subject as FLAT solid colour — the area around each subject pure magenta and any leftover cell area pure bright green — with no shadows, gradients or props, so the background can be removed. Do not copy anything else from the template.',
+    });
+    baseParts.push({
+      inline_data: { mime_type: 'image/png', data: (await buildTemplate()).toString('base64') },
+    });
+  }
+  // The model is stochastic about the strip layout / frame count; retry until it lands.
+  const maxAttempts = Math.max(1, Number(opt.retries ?? 5));
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    console.log(
+      `generating ${set}/${piece} with ${model} (${mode}, attempt ${attempt}/${maxAttempts})…`,
+    );
+    const buf = await callModel(baseParts, `${mode} strip`);
+    const raw = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const { width: w, height: h, channels } = raw.info;
+    const aspect = w / h;
+    let frames = 0;
+    if (aspect >= FRAME_COUNT * 0.6) {
+      const { keyed } = keyImage(raw.data, raw.info);
+      frames = detectFrames(keyed, w, h, channels).length;
+    }
+    const ok = aspect >= FRAME_COUNT * 0.6 && frames === FRAME_COUNT;
+    if (ok || attempt === maxAttempts) {
       writeFileSync(rawPath, buf);
-      console.log(`raw → ${rawPath} (${meta.width}x${meta.height})`);
-      if (aspect < FRAME_COUNT * 0.6)
-        console.warn(`  warning: not a ${FRAME_COUNT}:1 strip; processing may fail.`);
+      console.log(`raw → ${rawPath} (${w}x${h}, ${frames} frames)`);
+      if (!ok)
+        console.warn(`  warning: wanted ${FRAME_COUNT} frames in a strip; processing may fail.`);
       break;
     }
-    console.log(`  got ${meta.width}x${meta.height} (not a strip) — retrying…`);
+    const why =
+      aspect < FRAME_COUNT * 0.6
+        ? `${w}x${h} not a strip`
+        : `found ${frames}/${FRAME_COUNT} frames`;
+    console.log(`  ${why} — retrying…`);
   }
   return rawPath;
 }
@@ -244,21 +344,14 @@ function pickAlphaThreshold(data, ch) {
   return best;
 }
 
-async function processSheet(srcPath) {
-  const base = sharp(srcPath).ensureAlpha();
-  const { data, info } = await base.raw().toBuffer({ resolveWithObject: true });
+/**
+ * Key the background into the alpha channel. Auto-picks `alpha` (threshold a bimodal alpha
+ * histogram) or `chroma` (distance from the sampled corner colour) from the corners. In chroma
+ * mode it also keys the two flat template colours (magenta bg + green cells) so they never survive
+ * as opaque squares — pastel subjects are far from pure magenta/green, so this is always safe.
+ */
+function keyImage(data, info) {
   const { width: W, height: H, channels: ch } = info;
-  const aspect = W / H;
-  if (aspect < FRAME_COUNT * 0.6) {
-    throw new Error(
-      `raw image is ${W}x${H} (aspect ${aspect.toFixed(2)}), not a ~${FRAME_COUNT}:1 strip — ` +
-        `the model didn't emit a 6-frame row. Re-run with a layout reference (the default template, ` +
-        `or --ref <piece>) rather than --no-ref.`,
-    );
-  }
-  const fw = Math.floor(W / FRAME_COUNT);
-
-  // Decide keying mode from the corners.
   const corner = (x, y) => {
     const i = (y * W + x) * ch;
     return [data[i], data[i + 1], data[i + 2], data[i + 3]];
@@ -267,27 +360,11 @@ async function processSheet(srcPath) {
   const meanCornerA = corners.reduce((s, c) => s + c[3], 0) / corners.length;
   let mode = String(opt.key ?? 'auto');
   if (mode === 'auto') mode = meanCornerA < 200 ? 'alpha' : 'chroma';
-
   const threshold =
     opt.threshold !== undefined ? Number(opt.threshold) : pickAlphaThreshold(data, ch);
-  const bg = [
-    corners.reduce((s, c) => s + c[0], 0) / 4,
-    corners.reduce((s, c) => s + c[1], 0) / 4,
-    corners.reduce((s, c) => s + c[2], 0) / 4,
-  ];
-  console.log(
-    `key mode=${mode}` +
-      (mode === 'alpha'
-        ? ` threshold=${threshold}`
-        : ` chroma=rgb(${bg.map((v) => v | 0).join(',')})`),
-  );
-
-  // In chroma mode, key out the sampled corner colour AND the two flat template colours (magenta
-  // background + green placeholder cells), so the template's cells don't survive as opaque squares.
-  // Pastel subjects are far from pure magenta/green, so always including them is safe.
+  const bg = [0, 1, 2].map((k) => corners.reduce((s, c) => s + c[k], 0) / 4);
   const keyColors = [bg, [255, 0, 255], [0, 255, 0]];
 
-  // Apply the key into the alpha channel, in place.
   const keyed = Buffer.from(data);
   for (let i = 0; i < keyed.length; i += ch) {
     if (mode === 'alpha') {
@@ -303,54 +380,108 @@ async function processSheet(srcPath) {
       keyed[i + 3] = Math.min(data[i + 3], a);
     }
   }
+  return { keyed, mode, bg, threshold };
+}
 
-  // Per-frame content bbox, unioned into one shared rect (so frames stay aligned).
-  let minX = fw,
-    minY = H,
-    maxX = 0,
-    maxY = 0;
-  for (let f = 0; f < FRAME_COUNT; f++) {
-    const ox = f * fw;
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < fw; x++) {
-        const a = keyed[(y * W + ox + x) * ch + 3];
-        if (a > 24) {
+/**
+ * Find the subject frames by their column profile: runs of columns that contain opaque pixels,
+ * separated by transparent gaps. Returns `[x0, x1]` ranges. Used both to crop (so frames stay
+ * aligned even when the model spaces them unevenly) and to count frames (reject ≠ FRAME_COUNT).
+ */
+function detectFrames(keyed, W, H, ch) {
+  const need = H * 0.04; // a column counts as "content" if >4% of it is opaque
+  const has = new Array(W);
+  for (let x = 0; x < W; x++) {
+    let c = 0;
+    for (let y = 0; y < H; y++) if (keyed[(y * W + x) * ch + 3] > 40) c++;
+    has[x] = c > need;
+  }
+  const runs = [];
+  let s = -1;
+  for (let x = 0; x < W; x++) {
+    if (has[x]) {
+      if (s < 0) s = x;
+    } else if (s >= 0) {
+      runs.push([s, x - 1]);
+      s = -1;
+    }
+  }
+  if (s >= 0) runs.push([s, W - 1]);
+  // bridge tiny gaps (a subject whose limbs briefly thin out) and drop specks
+  const minGap = Math.round(W * 0.012);
+  const merged = [];
+  for (const r of runs) {
+    const last = merged[merged.length - 1];
+    if (last && r[0] - last[1] <= minGap) last[1] = r[1];
+    else merged.push([r[0], r[1]]);
+  }
+  const minW = Math.round((W / FRAME_COUNT) * 0.25);
+  return merged.filter((r) => r[1] - r[0] + 1 >= minW);
+}
+
+async function processSheet(srcPath) {
+  const { data, info } = await sharp(srcPath)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const { width: W, height: H, channels: ch } = info;
+  if (W / H < FRAME_COUNT * 0.6) {
+    throw new Error(
+      `raw image is ${W}x${H}, not a ~${FRAME_COUNT}:1 strip — the model didn't emit a frame row. ` +
+        `Regenerate (the default template, or --ref <piece>).`,
+    );
+  }
+  const { keyed, mode, bg, threshold } = keyImage(data, info);
+  console.log(
+    `key mode=${mode}` +
+      (mode === 'alpha'
+        ? ` threshold=${threshold}`
+        : ` chroma=rgb(${bg.map((v) => v | 0).join(',')})`),
+  );
+
+  // Detect the actual subject frames; bail clearly if the model drew the wrong number.
+  const segs = detectFrames(keyed, W, H, ch);
+  if (segs.length !== FRAME_COUNT) {
+    throw new Error(
+      `detected ${segs.length} subject frames, expected ${FRAME_COUNT} — the model drew the wrong ` +
+        `number. Regenerate (the generator retries until it gets ${FRAME_COUNT}).`,
+    );
+  }
+
+  // Per-frame content bbox (y bounds + tightened x bounds within each detected segment).
+  const boxes = segs.map(([x0, x1]) => {
+    let minX = x1,
+      maxX = x0,
+      minY = H,
+      maxY = 0;
+    for (let y = 0; y < H; y++)
+      for (let x = x0; x <= x1; x++)
+        if (keyed[(y * W + x) * ch + 3] > 24) {
           if (x < minX) minX = x;
           if (x > maxX) maxX = x;
           if (y < minY) minY = y;
           if (y > maxY) maxY = y;
         }
-      }
-    }
-  }
-  if (maxX < minX) {
-    minX = 0;
-    minY = 0;
-    maxX = fw - 1;
-    maxY = H - 1;
-  }
+    if (maxX < minX) return { minX: x0, maxX: x1, minY: 0, maxY: H - 1 };
+    return { minX, maxX, minY, maxY };
+  });
 
-  // Square + pad the shared crop, centered, clamped to a single frame.
-  const cw = maxX - minX + 1;
-  const cwH = maxY - minY + 1;
-  let sq = Math.max(cw, cwH);
-  sq = Math.min(Math.round(sq * (1 + pad * 2)), fw, H);
-  const cx = (minX + maxX) / 2;
-  const cy = (minY + maxY) / 2;
-  let left = Math.round(cx - sq / 2);
-  let top = Math.round(cy - sq / 2);
-  left = Math.max(0, Math.min(left, fw - sq));
-  top = Math.max(0, Math.min(top, H - sq));
+  // One shared square sized to the largest subject, so every frame is cropped at the same scale.
+  let maxDim = 0;
+  for (const b of boxes) maxDim = Math.max(maxDim, b.maxX - b.minX + 1, b.maxY - b.minY + 1);
+  const sq = Math.min(Math.round(maxDim * (1 + pad * 2)), H);
 
-  // Crop each frame to the shared square, resize to frameSize, composite into the strip.
+  // Crop each detected frame (centred on its subject) to the shared square, resize, assemble.
   const rawKeyedPng = await sharp(keyed, { raw: { width: W, height: H, channels: ch } })
     .png()
     .toBuffer();
   const tiles = [];
   for (let f = 0; f < FRAME_COUNT; f++) {
-    const exLeft = Math.min(f * fw + left, W - sq); // clamp so the last frame can't overrun width
+    const b = boxes[f];
+    const left = Math.max(0, Math.min(Math.round((b.minX + b.maxX) / 2 - sq / 2), W - sq));
+    const top = Math.max(0, Math.min(Math.round((b.minY + b.maxY) / 2 - sq / 2), H - sq));
     const tile = await sharp(rawKeyedPng)
-      .extract({ left: exLeft, top, width: sq, height: sq })
+      .extract({ left, top, width: sq, height: sq })
       .resize(frameSize, frameSize, { fit: 'fill' })
       .png()
       .toBuffer();
@@ -367,11 +498,18 @@ async function processSheet(srcPath) {
     .composite(tiles)
     .png({ palette: true, quality: 90 })
     .toFile(outPath);
-  console.log(`sheet → ${outPath} (${frameSize * FRAME_COUNT}x${frameSize})`);
+  console.log(
+    `sheet → ${outPath} (${frameSize * FRAME_COUNT}x${frameSize}, ${FRAME_COUNT} frames)`,
+  );
 }
 
 // ---- run -----------------------------------------------------------------
-const srcPath = opt['no-generate'] ? (existsSync(rawPath) ? rawPath : outPath) : await generate();
+// Default to the per-frame editing pipeline; the single-shot strip generator is opt-in via
+// --strip, or implied by --ref / --no-ref.
+const useStrip = opt.strip || typeof opt.ref === 'string' || opt['no-ref'];
+let srcPath;
+if (opt['no-generate']) srcPath = existsSync(rawPath) ? rawPath : outPath;
+else srcPath = useStrip ? await generate() : await generateFrames();
 await processSheet(srcPath);
 if (!opt['keep-raw'] && !opt['no-generate'] && existsSync(rawPath)) {
   // raw is large; remove unless asked to keep it
