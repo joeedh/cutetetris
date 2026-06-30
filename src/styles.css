@@ -256,13 +256,26 @@ header.top {
 }
 #board {
   display: block;
-  width: 300px;
-  max-width: 74vw;
+  /* The board is the tallest element on the page, so cap it by viewport height
+     as well as width: on short viewports (e.g. a high-DPR / zoomed display)
+     shrink it so the whole app fits without a scrollbar. --chrome ≈ the height
+     of everything stacked around it; board height = 2 × width via aspect-ratio.
+     The dvh line refines the vh line where supported (mobile URL-bar aware). */
+  --chrome: 460px;
+  width: min(300px, 74vw, calc((100vh - var(--chrome)) / 2));
+  width: min(300px, 74vw, calc((100dvh - var(--chrome)) / 2));
   height: auto;
   aspect-ratio: 1 / 2;
   border-radius: 16px;
   background: var(--board-bg);
   touch-action: none;
+}
+@media (hover: hover) and (min-width: 560px) {
+  /* the touch pad is hidden and the stat bar fits one row, so far less stacks
+     around the board than on a narrow/touch layout. */
+  #board {
+    --chrome: 330px;
+  }
 }
 
 .overlay {

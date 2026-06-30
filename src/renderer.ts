@@ -10,11 +10,13 @@ function setupCanvas(
   w: number,
   h: number,
 ): void {
+  // The display size is set in CSS so the layout can scale the board down to fit
+  // short viewports (e.g. on a high-DPR / zoomed display). Here we only size the
+  // backing store for the device pixel ratio and scale the context to match, so
+  // the renderer keeps drawing in logical CSS-pixel coordinates.
   const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  cv.width = w * dpr;
-  cv.height = h * dpr;
-  cv.style.width = w + 'px';
-  cv.style.height = h + 'px';
+  cv.width = Math.round(w * dpr);
+  cv.height = Math.round(h * dpr);
   c.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
