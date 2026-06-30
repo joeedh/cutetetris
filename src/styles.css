@@ -79,6 +79,9 @@ header.top {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  /* On narrow/mobile widths the brand + skin picker + icon buttons don't fit one row; let the
+     controls wrap to their own line (right-aligned) instead of overflowing off-screen. */
+  flex-wrap: wrap;
 }
 .brand {
   display: flex;
@@ -126,6 +129,8 @@ header.top {
 .iconbtns {
   display: flex;
   gap: 8px;
+  /* right-align the controls, incl. when they wrap to their own row on mobile */
+  margin-left: auto;
 }
 .ibtn {
   font-family: 'Fredoka';
@@ -155,22 +160,34 @@ header.top {
 }
 
 .skinpick {
+  /* Reset the native control so it styles + taps consistently on mobile Chrome/Safari, and draw
+     our own caret (the gradient otherwise hides the platform arrow, so it read as a static pill). */
+  appearance: none;
+  -webkit-appearance: none;
   font-family: 'Fredoka';
   font-weight: 600;
-  font-size: 14px;
+  /* 16px (not 14) so iOS doesn't zoom-on-focus, which left the dropdown feeling unresponsive. */
+  font-size: 16px;
   height: 46px;
-  padding: 0 12px;
+  max-width: 46vw;
+  padding: 0 32px 0 14px;
   border-radius: 16px;
   border: 2px solid #fff;
   cursor: pointer;
   color: #b5567d;
-  background: linear-gradient(160deg, #fff, #ffeaf2);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23b5567d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+      right 12px center / 11px no-repeat,
+    linear-gradient(160deg, #fff, #ffeaf2);
   box-shadow:
     0 6px 14px rgba(255, 140, 170, 0.35),
     inset 0 1px 0 rgba(255, 255, 255, 0.6);
   transition:
     transform 0.12s ease,
     filter 0.12s ease;
+  /* keep it above neighbouring header chrome so the tap always lands on the select */
+  position: relative;
+  z-index: 2;
 }
 .skinpick:active {
   transform: translateY(2px) scale(0.96);
