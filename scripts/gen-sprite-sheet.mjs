@@ -148,9 +148,12 @@ function refSheetPath() {
 }
 
 /**
- * A blank layout template: magenta with `FRAME_COUNT` cream placeholder cells. Conditions the
- * model to emit a 6:1 strip of evenly-spaced frames WITHOUT giving it any subject to copy (a real
- * reference sheet tends to leak its subject into a frame). This is the default when no `--ref`.
+ * A blank layout template: magenta with `FRAME_COUNT` bright-green placeholder cells. Conditions
+ * the model to emit a 6:1 strip of evenly-spaced frames WITHOUT giving it any subject to copy (a
+ * real reference sheet tends to leak its subject into a frame). Both template colours (magenta +
+ * green) are pure chroma absent from pastel subjects, so whatever the model leaves of them gets
+ * keyed out cleanly — unlike a cream cell, which would survive as an opaque square. Default when
+ * no `--ref`.
  */
 function buildTemplate() {
   const cell = 320;
@@ -159,7 +162,7 @@ function buildTemplate() {
   const cells = Array.from({ length: FRAME_COUNT }, (_, i) => {
     const pad = cell * 0.1;
     const w = cell - pad * 2;
-    return `<rect x="${i * cell + pad}" y="${pad}" width="${w}" height="${w}" rx="${w * 0.18}" fill="#f3ece2"/>`;
+    return `<rect x="${i * cell + pad}" y="${pad}" width="${w}" height="${w}" rx="${w * 0.18}" fill="#00FF00"/>`;
   }).join('');
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="#FF00FF"/>${cells}</svg>`;
   return sharp(Buffer.from(svg)).png().toBuffer();
@@ -182,7 +185,7 @@ async function generate() {
   } else if (!opt['no-ref']) {
     mode = 'template';
     parts.unshift({
-      text: 'The image that follows is a BLANK LAYOUT TEMPLATE: a magenta canvas with 6 empty cream cells in a row. Paint the new subject into each of the 6 cells (one expression per cell, left to right) and keep the magenta background. Do not copy anything else from the template.',
+      text: 'The image that follows is a BLANK LAYOUT TEMPLATE: a magenta canvas with 6 empty bright-green cells in a row. Paint the new subject into each of the 6 cells (one expression per cell, left to right). Leave everything that is not the subject as FLAT solid colour — the area around each subject pure magenta and any leftover cell area pure bright green — with no shadows, gradients or props, so the background can be removed. Do not copy anything else from the template.',
     });
     parts.push({
       inline_data: { mime_type: 'image/png', data: (await buildTemplate()).toString('base64') },
@@ -279,14 +282,23 @@ async function processSheet(srcPath) {
         : ` chroma=rgb(${bg.map((v) => v | 0).join(',')})`),
   );
 
+  // In chroma mode, key out the sampled corner colour AND the two flat template colours (magenta
+  // background + green placeholder cells), so the template's cells don't survive as opaque squares.
+  // Pastel subjects are far from pure magenta/green, so always including them is safe.
+  const keyColors = [bg, [255, 0, 255], [0, 255, 0]];
+
   // Apply the key into the alpha channel, in place.
   const keyed = Buffer.from(data);
   for (let i = 0; i < keyed.length; i += ch) {
     if (mode === 'alpha') {
       keyed[i + 3] = data[i + 3] < threshold ? 0 : data[i + 3];
     } else {
-      const dist = Math.hypot(data[i] - bg[0], data[i + 1] - bg[1], data[i + 2] - bg[2]);
-      // soft ramp: <60 from bg → transparent, >110 → opaque
+      let dist = Infinity;
+      for (const c of keyColors) {
+        const d = Math.hypot(data[i] - c[0], data[i + 1] - c[1], data[i + 2] - c[2]);
+        if (d < dist) dist = d;
+      }
+      // soft ramp: <60 from a key colour → transparent, >110 → opaque
       const a = dist <= 60 ? 0 : dist >= 110 ? 255 : Math.round(((dist - 60) / 50) * 255);
       keyed[i + 3] = Math.min(data[i + 3], a);
     }
