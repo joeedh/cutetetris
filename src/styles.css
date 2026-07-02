@@ -97,7 +97,9 @@ header.top {
   background: #fdf3ea url(./assets/logo.png) center / cover no-repeat;
   box-shadow: 0 6px 14px rgba(255, 150, 185, 0.35);
 }
-@media (max-width: 360px) {
+@media (max-width: 559px) {
+  /* hide the logo badge on phones — its 56px row height comes straight out of
+     the board's height budget */
   .logo {
     display: none;
   }
@@ -298,11 +300,13 @@ header.top {
   /* The board is the tallest element on the page, so cap it by viewport height
      as well as width: on short viewports (e.g. a high-DPR / zoomed display)
      shrink it so the whole app fits without a scrollbar. --chrome ≈ the height
-     of everything stacked around it; board height = 2 × width via aspect-ratio.
+     of everything stacked around it; --side ≈ the horizontal chrome (body padding
+     + frame padding/border); board height = 2 × width via aspect-ratio.
      The dvh line refines the vh line where supported (mobile URL-bar aware). */
   --chrome: 460px;
-  width: min(300px, 74vw, calc((100vh - var(--chrome)) / 2));
-  width: min(300px, 74vw, calc((100dvh - var(--chrome)) / 2));
+  --side: 58px;
+  width: min(300px, calc(100vw - var(--side)), calc((100vh - var(--chrome)) / 2));
+  width: min(300px, calc(100vw - var(--side)), calc((100dvh - var(--chrome)) / 2));
   height: auto;
   aspect-ratio: 1 / 2;
   border-radius: 16px;
@@ -314,6 +318,67 @@ header.top {
      around the board than on a narrow/touch layout. */
   #board {
     --chrome: 330px;
+  }
+}
+@media (max-width: 559px) {
+  /* Phones: compact the chrome stacked around the board (header, stat bar, gaps,
+     mascot headroom, pad buttons) so the board itself gets a much larger share of
+     the screen — the numbers here must stay in sync with #board's --chrome below. */
+  body {
+    padding: 12px 8px 16px;
+  }
+  .app {
+    gap: 10px;
+  }
+  .wordmark .sub {
+    display: none;
+  }
+  .ibtn,
+  .skinpick {
+    height: 42px;
+  }
+  .ibtn {
+    width: 42px;
+  }
+  /* keep all four stat tiles (incl. Next) on ONE row — the Next tile otherwise
+     wraps to a whole row of its own, costing ~90px of board height */
+  .statbar {
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+  .stat {
+    min-width: 0;
+    padding: 7px 6px;
+  }
+  .stat .k {
+    font-size: 10px;
+    letter-spacing: 1px;
+  }
+  .stat.next {
+    min-width: 0;
+  }
+  #nextCanvas {
+    width: 63px;
+    height: 45px;
+    margin: 0 auto;
+  }
+  .stage {
+    margin-top: 44px;
+  }
+  .board-frame {
+    padding: 10px;
+  }
+  .overlay {
+    inset: 10px;
+  }
+  .cbtn {
+    font-size: 20px;
+    padding: 9px 0;
+    border-radius: 16px;
+  }
+  #board {
+    --chrome: 352px;
+    --side: 44px;
   }
 }
 
