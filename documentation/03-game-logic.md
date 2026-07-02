@@ -71,14 +71,14 @@ the clear effects (`spawnClearFx`). The renderer animates those rows hopping and
 
 ## Scoring
 
-| Event | Points |
-| --- | --- |
-| Soft drop | +1 per cell |
-| Hard drop | +2 per cell |
-| 1 / 2 / 3 / 4 lines | 100 / 300 / 500 / 800 × level |
-| Combo (2+ consecutive clears) | +50 × combo × level, with a "combo x N 💕" popup |
-| Level up | chime + "level N! ✦" popup |
-| Perfect clear (board empty after a clear) | +1000 × level, "perfect!! ✧✧", heart burst |
+| Event                                     | Points                                           |
+| ----------------------------------------- | ------------------------------------------------ |
+| Soft drop                                 | +1 per cell                                      |
+| Hard drop                                 | +2 per cell                                      |
+| 1 / 2 / 3 / 4 lines                       | 100 / 300 / 500 / 800 × level                    |
+| Combo (2+ consecutive clears)             | +50 × combo × level, with a "combo x N 💕" popup |
+| Level up                                  | chime + "level N! ✦" popup                       |
+| Perfect clear (board empty after a clear) | +1000 × level, "perfect!! ✧✧", heart burst       |
 
 `combo` increments on each clearing lock and resets to 0 whenever a piece locks with no lines
 cleared.

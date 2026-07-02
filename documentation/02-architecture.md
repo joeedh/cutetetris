@@ -6,23 +6,23 @@ together in `main.ts`, which also runs the animation loop.
 
 ## Module map (`src/`)
 
-| Module | Role |
-| --- | --- |
-| `main.ts` | Thin bootstrap: build the objects, attach input, start the rAF loop. |
-| `game.ts` | **`Game`** — owns all mutable state and the rules (spawn, move, rotate, drop, lock, clear, tick). |
-| `renderer.ts` | **`Renderer`** — holds the 3 canvas contexts; reads a `Game` each frame to draw. Stateless w.r.t. game logic. |
-| `fx.ts` | Particle / popup / ambient spawning and per-frame update; free functions operating on a `Game`. |
-| `audio.ts` | **`AudioEngine`** — Web Audio synthesis (`sfx`) + sampled voice clips (`playClip`), mute. |
-| `ui.ts` | **`Ui`** — the DOM that reflects state (stat readouts, overlay, pause icon). |
-| `input.ts` | Keyboard + pointer/touch wiring → `Game` methods. |
-| `constants.ts` | Board dims, `SHAPES`, `COLORS`, `TYPES`, timings, `rotate()`, `TYPE_BY_COLOR`. |
-| `rng.ts` | **`SevenBag`** randomizer. |
-| `draw-helpers.ts` | Pure canvas drawing helpers (`drawBlock`, `drawHeart`, `drawStar`, `rr`, color `mix`). |
-| `sprites.ts` | Loads & slices sprite sheets into per-expression frames; picks the active frame. |
-| `sprite-sets.ts` | Declares the selectable skins (id, label, per-piece sheet URLs). |
-| `sprite-select.ts` | Builds the skin dropdown and persists the choice to `localStorage`. |
-| `dom.ts` | `el` / `canvas` / `ctx2d` lookups that **throw** if missing (no casts). |
-| `types.ts` | Shared type/interface definitions. `env.d.ts` — `declare module '*.css'`. |
+| Module             | Role                                                                                                          |
+| ------------------ | ------------------------------------------------------------------------------------------------------------- |
+| `main.ts`          | Thin bootstrap: build the objects, attach input, start the rAF loop.                                          |
+| `game.ts`          | **`Game`** — owns all mutable state and the rules (spawn, move, rotate, drop, lock, clear, tick).             |
+| `renderer.ts`      | **`Renderer`** — holds the 3 canvas contexts; reads a `Game` each frame to draw. Stateless w.r.t. game logic. |
+| `fx.ts`            | Particle / popup / ambient spawning and per-frame update; free functions operating on a `Game`.               |
+| `audio.ts`         | **`AudioEngine`** — Web Audio synthesis (`sfx`) + sampled voice clips (`playClip`), mute.                     |
+| `ui.ts`            | **`Ui`** — the DOM that reflects state (stat readouts, overlay, pause icon).                                  |
+| `input.ts`         | Keyboard + pointer/touch wiring → `Game` methods.                                                             |
+| `constants.ts`     | Board dims, `SHAPES`, `COLORS`, `TYPES`, timings, `rotate()`, `TYPE_BY_COLOR`.                                |
+| `rng.ts`           | **`SevenBag`** randomizer.                                                                                    |
+| `draw-helpers.ts`  | Pure canvas drawing helpers (`drawBlock`, `drawHeart`, `drawStar`, `rr`, color `mix`).                        |
+| `sprites.ts`       | Loads & slices sprite sheets into per-expression frames; picks the active frame.                              |
+| `sprite-sets.ts`   | Declares the selectable skins (id, label, per-piece sheet URLs).                                              |
+| `sprite-select.ts` | Builds the skin dropdown and persists the choice to `localStorage`.                                           |
+| `dom.ts`           | `el` / `canvas` / `ctx2d` lookups that **throw** if missing (no casts).                                       |
+| `types.ts`         | Shared type/interface definitions. `env.d.ts` — `declare module '*.css'`.                                     |
 
 ## Ownership & dependencies
 
@@ -48,8 +48,8 @@ frame and falls back to procedural drawing when none is loaded. See
 ## The bootstrap (`main.ts`)
 
 ```ts
-makeClouds();            // decorative drifting clouds in the #sky div
-attachSpriteSelect();    // build skin dropdown, restore saved choice, load active sheets
+makeClouds(); // decorative drifting clouds in the #sky div
+attachSpriteSelect(); // build skin dropdown, restore saved choice, load active sheets
 
 const audio = new AudioEngine();
 const ui = new Ui();
@@ -57,11 +57,11 @@ const renderer = new Renderer();
 const game = new Game(audio, ui);
 
 attachInput(game, audio);
-game.initIdle();         // empty board + ambient hearts + a queued preview (attract screen)
+game.initIdle(); // empty board + ambient hearts + a queued preview (attract screen)
 
 function frame(time) {
-  game.tick(time);       // advance simulation by one frame
-  renderer.draw(game);   // paint the current state
+  game.tick(time); // advance simulation by one frame
+  renderer.draw(game); // paint the current state
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
@@ -77,7 +77,7 @@ Every animation frame does exactly two things, in order:
    simulates while `status === 'playing'` (plus a `clearing` branch that waits out the clear
    animation). See [03 — Game logic](03-game-logic.md).
 2. **`renderer.draw(game)`** — read the state and paint the three canvases. The renderer computes
-   *presentation-only* animation itself (blink timers, glance direction, settle squish, danger
+   _presentation-only_ animation itself (blink timers, glance direction, settle squish, danger
    detection, mascot mood) so the game state stays about rules, not cosmetics. See
    [04 — Rendering](04-rendering.md).
 

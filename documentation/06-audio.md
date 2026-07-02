@@ -27,17 +27,17 @@ gain, ramps the gain up over 12 ms and exponentially back down over `dur` (a sof
 and connects through the master gain. Each named SFX is a short arpeggio or chord built from one or
 more `tone` calls at staggered delays.
 
-| Name | Feel |
-| --- | --- |
-| `move` | tiny triangle blip |
-| `rotate` | two rising triangle blips |
-| `lock` | low sine thud |
-| `drop` | blip + low thump |
+| Name                           | Feel                                       |
+| ------------------------------ | ------------------------------------------ |
+| `move`                         | tiny triangle blip                         |
+| `rotate`                       | two rising triangle blips                  |
+| `lock`                         | low sine thud                              |
+| `drop`                         | blip + low thump                           |
 | `clear1` / `clear2` / `clear3` | ascending sine runs, longer per line count |
-| `tetris` | a bright 7-note triangle fanfare |
-| `levelup` | rising three-note sine |
-| `perfect` | a brighter four-note sine flourish |
-| `over` | a descending four-note "aww" |
+| `tetris`                       | a bright 7-note triangle fanfare           |
+| `levelup`                      | rising three-note sine                     |
+| `perfect`                      | a brighter four-note sine flourish         |
+| `over`                         | a descending four-note "aww"               |
 
 `sfx` is a no-op if the context isn't initialized or audio is muted.
 
@@ -57,17 +57,17 @@ asset URLs. `playClip`:
 
 ## Where sounds fire
 
-| Trigger | Sound |
-| --- | --- |
-| move / rotate | `sfx('move')` / `sfx('rotate')` |
-| hard drop | `sfx('drop')` |
-| lock (no clear) | `sfx('lock')` |
-| 1–3 line clear | `sfx('clear1'|'clear2'|'clear3')` |
-| 4-line clear | `sfx('tetris')` |
-| level up | `sfx('levelup')` |
-| perfect clear | `sfx('perfect')` |
-| game over | `sfx('over')` |
-| neighbour bicker | `playClip('bicker')` |
-| post-clear cheer | `playClip('celebrate')` |
+| Trigger          | Sound                           |
+| ---------------- | ------------------------------- | -------- | ---------- |
+| move / rotate    | `sfx('move')` / `sfx('rotate')` |
+| hard drop        | `sfx('drop')`                   |
+| lock (no clear)  | `sfx('lock')`                   |
+| 1–3 line clear   | `sfx('clear1'                   | 'clear2' | 'clear3')` |
+| 4-line clear     | `sfx('tetris')`                 |
+| level up         | `sfx('levelup')`                |
+| perfect clear    | `sfx('perfect')`                |
+| game over        | `sfx('over')`                   |
+| neighbour bicker | `playClip('bicker')`            |
+| post-clear cheer | `playClip('celebrate')`         |
 
 These are the only bundled audio assets in the project; everything else is generated at runtime.

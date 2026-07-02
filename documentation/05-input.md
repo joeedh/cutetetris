@@ -10,9 +10,9 @@ D-pad and dragging directly on the board).
 because browsers block audio autoplay, so it lives on the click/keydown handlers and does, in order:
 
 ```ts
-audio.init();       // create the AudioContext + master gain (first time only)
-audio.resume();     // resume if the context started suspended
-audio.initClips();  // preload the sampled voice clips
+audio.init(); // create the AudioContext + master gain (first time only)
+audio.resume(); // resume if the context started suspended
+audio.initClips(); // preload the sampled voice clips
 game.newGame();
 ```
 
@@ -28,16 +28,16 @@ that dismisses the overlay doesn't also rotate a piece.
 
 ## Keyboard
 
-| Key | Action |
-| --- | --- |
-| ← / → | `move(-1)` / `move(1)` |
-| ↓ | hold to soft drop (`softDrop = true` on keydown, `false` on keyup) |
-| ↑ or **X** | rotate clockwise (`doRotate(1)`) |
-| **Z** | rotate counter-clockwise (`doRotate(-1)`) |
-| **Space** | hard drop |
-| **P** | pause / resume |
-| **M** | mute toggle |
-| Enter / Space (on `ready`/`over`) | start game |
+| Key                               | Action                                                             |
+| --------------------------------- | ------------------------------------------------------------------ |
+| ← / →                             | `move(-1)` / `move(1)`                                             |
+| ↓                                 | hold to soft drop (`softDrop = true` on keydown, `false` on keyup) |
+| ↑ or **X**                        | rotate clockwise (`doRotate(1)`)                                   |
+| **Z**                             | rotate counter-clockwise (`doRotate(-1)`)                          |
+| **Space**                         | hard drop                                                          |
+| **P**                             | pause / resume                                                     |
+| **M**                             | mute toggle                                                        |
+| Enter / Space (on `ready`/`over`) | start game                                                         |
 
 Arrow keys and Space are `preventDefault`ed so the page doesn't scroll. While in `ready`/`over`,
 only the start keys are honored; everything else is ignored until play begins.

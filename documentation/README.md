@@ -4,21 +4,21 @@ High-level documentation of how **Tetromochi** works: a cute, canvas-based Tetri
 blocks are "mochi" with faces and a rabbit mascot reacts to your play.
 
 This documentation describes the TypeScript app under `src/`. For day-to-day commands, toolchain
-notes, and conventions, see the repo's [`CLAUDE.md`](../CLAUDE.md); this folder focuses on *how the
-running app is put together*.
+notes, and conventions, see the repo's [`CLAUDE.md`](../CLAUDE.md); this folder focuses on _how the
+running app is put together_.
 
 ## Contents
 
-| Doc | What it covers |
-| --- | --- |
-| [01 — Overview](01-overview.md) | What the app is, the tech stack, and how it builds & runs. |
-| [02 — Architecture](02-architecture.md) | Module map, the state/render split, and the frame loop. |
-| [03 — Game logic](03-game-logic.md) | The `Game` class: rules, piece lifecycle, scoring, levels. |
-| [04 — Rendering](04-rendering.md) | The `Renderer`: board, blocks, next-piece, and the mascot. |
-| [05 — Input](05-input.md) | Keyboard, on-screen buttons, and board touch gestures. |
-| [06 — Audio](06-audio.md) | Synthesized SFX plus the sampled mochi "voice" clips. |
-| [07 — Sprites & skins](07-sprites-and-skins.md) | The sprite-sheet skin system and procedural fallback. |
-| [08 — Effects & cuteness](08-effects-and-cuteness.md) | Particles, popups, expressions, and mascot moods. |
+| Doc                                                   | What it covers                                             |
+| ----------------------------------------------------- | ---------------------------------------------------------- |
+| [01 — Overview](01-overview.md)                       | What the app is, the tech stack, and how it builds & runs. |
+| [02 — Architecture](02-architecture.md)               | Module map, the state/render split, and the frame loop.    |
+| [03 — Game logic](03-game-logic.md)                   | The `Game` class: rules, piece lifecycle, scoring, levels. |
+| [04 — Rendering](04-rendering.md)                     | The `Renderer`: board, blocks, next-piece, and the mascot. |
+| [05 — Input](05-input.md)                             | Keyboard, on-screen buttons, and board touch gestures.     |
+| [06 — Audio](06-audio.md)                             | Synthesized SFX plus the sampled mochi "voice" clips.      |
+| [07 — Sprites & skins](07-sprites-and-skins.md)       | The sprite-sheet skin system and procedural fallback.      |
+| [08 — Effects & cuteness](08-effects-and-cuteness.md) | Particles, popups, expressions, and mascot moods.          |
 
 ## The one-paragraph version
 
