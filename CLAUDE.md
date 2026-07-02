@@ -9,6 +9,20 @@ written in TypeScript and bundled with esbuild. It started life as a single self
 `Tetromochi.html` (still in the repo as the reference/baseline) and was ported to a proper
 TypeScript app under `src/`.
 
+## Documentation
+
+High-level docs on how the app works live in [`documentation/`](documentation/README.md) — start
+at the [README](documentation/README.md) index. This CLAUDE.md is the quick reference for
+toolchain/commands/conventions; `documentation/` is the deeper "how it's built" guide:
+
+- [01 — Overview](documentation/01-overview.md) · [02 — Architecture](documentation/02-architecture.md)
+  · [03 — Game logic](documentation/03-game-logic.md) · [04 — Rendering](documentation/04-rendering.md)
+- [05 — Input](documentation/05-input.md) · [06 — Audio](documentation/06-audio.md)
+  · [07 — Sprites & skins](documentation/07-sprites-and-skins.md)
+  · [08 — Effects & cuteness](documentation/08-effects-and-cuteness.md)
+
+Keep these in sync when you change how a subsystem works.
+
 ## Commands
 
 ```bash
@@ -46,19 +60,25 @@ with `--eval "document.getElementById('playBtn').click()"`. `screenshots/` is gi
 
 ## Architecture (`src/`)
 
-State and rendering are separated; everything is wired together in `main.ts`.
+State and rendering are separated; everything is wired together in `main.ts`. See
+[documentation/02-architecture.md](documentation/02-architecture.md) for the fuller picture.
 
-- `main.ts` — thin bootstrap: makes clouds, constructs `AudioEngine`/`Ui`/`Renderer`/`Game`,
-  attaches input, runs the `requestAnimationFrame` loop (`game.tick(time)` then `renderer.draw(game)`).
+- `main.ts` — thin bootstrap: makes clouds, wires the skin dropdown, constructs
+  `AudioEngine`/`Ui`/`Renderer`/`Game`, attaches input, runs the `requestAnimationFrame` loop
+  (`game.tick(time)` then `renderer.draw(game)`).
 - `game.ts` — **`Game`** class owns all mutable state (grid, current piece, score, timers,
   particles, etc.) and the rules: `spawn/collide/move/doRotate/hardDrop/lockPiece/resolveClear/tick`.
 - `renderer.ts` — **`Renderer`** class holds the 3 canvas contexts; reads a `Game` each frame to
   draw the board, next-piece preview, and mascot. Stateless w.r.t. game logic.
 - `fx.ts` — particle/popup/ambient spawning + per-frame update; functions that operate on a `Game`.
-- `audio.ts` — **`AudioEngine`**: Web Audio synthesis (no audio files), `sfx(name)`, mute.
+- `audio.ts` — **`AudioEngine`**: Web Audio synthesis (`sfx(name)`, no files) + pitched-up sampled
+  voice clips (`playClip`) from `assets/sfx/*.ogg`; mute.
 - `ui.ts` — **`Ui`**: the DOM that reflects state (stat readouts, overlay, pause icon).
-- `input.ts` — keyboard + pointer/touch wiring → `Game` methods.
-- `constants.ts` — board dims, `SHAPES`, `COLORS`, `TYPES`, timings, `rotate()`.
+- `input.ts` — keyboard + pointer/touch wiring (incl. board drag gestures) → `Game` methods.
+- `constants.ts` — board dims, `SHAPES`, `COLORS`, `TYPES`, `TYPE_BY_COLOR`, timings, `rotate()`.
+- `sprites.ts` / `sprite-sets.ts` / `sprite-select.ts` — the block **skin** system: declare the
+  selectable sets, load+slice sheets into per-expression frames, and the persisted skin dropdown.
+  `draw-helpers.drawBlock` prefers a sprite frame and falls back to procedural drawing.
 - `rng.ts` — **`SevenBag`** randomizer. `draw-helpers.ts` — pure canvas drawing helpers.
 - `dom.ts` — `el`/`canvas`/`ctx2d` lookups that **throw** if missing (no casts).
 - `types.ts` — shared types. `env.d.ts` — `declare module '*.css'` for the side-effect import.
