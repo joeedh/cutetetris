@@ -1,4 +1,12 @@
 {
   "label": "Mochi",
-  "theme": "a cute soft watercolor storybook mochi block with a kawaii face, pastel pink/lavender/cream palette"
+  "theme": "a cute soft watercolor storybook mochi block with a kawaii face, pastel pink/lavender/cream palette",
+  "poses": {
+    "walk-a": "a squash-and-stretch hop anticipation: the blob squashed down low and wide, leaning to one side as it winds up a little hop, content face",
+    "walk-b": "the alternating phase of the SAME hop: the blob stretched tall and narrow, leaning into the motion mid-bounce, content face",
+    "cards": "the SAME big blob character, still LARGE and filling the frame exactly like the attached image, now holding a small fan of three playing cards in front of its chest with tiny nub hands, peeking at them with a concentrating happy face — the cards are small compared to its body",
+    "punch-a": "a playful play-fight wind-up: leaning back with one little nub arm pulled back, ready to throw a soft bop, puffed-cheek determined face (cartoonish and cute)",
+    "punch-b": "the bop landing: that little nub arm stretched out forward, body leaning forward, same playful cartoon fight, cute determined face",
+    "scurry": "a panicked scurrying dash: the blob leaning far forward as if fleeing at full speed, eyes drawn as wide startled circles, eyebrows high, mouth open in a small alarmed 'waah' shape, one big sweat drop flying off, crisp clean edges (no motion blur)"
+  }
 }

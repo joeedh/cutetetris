@@ -1,6 +1,6 @@
 ---
 name: gen-sprite-sheet
-description: Generate a Tetromochi block sprite sheet for a skin set with Gemini and apply background removal. Use when the user asks to "generate a sprite sheet", "make the <piece> for the <set> skin", "add a block skin", "fill in a sprite set", or similar art-asset requests for the tetromino block sheets under src/assets/blocks/.
+description: Generate a Tetromochi block sprite sheet (expression or action-pose) for a skin set with Gemini, apply background removal, and validate the frames. Use when the user asks to "generate a sprite sheet", "make the <piece> for the <set> skin", "add a block skin", "fill in a sprite set", "generate action/animation frames", or similar art-asset requests for the tetromino block sheets under src/assets/blocks/ or props under src/assets/props/.
 ---
 
 # Generate a block sprite sheet
@@ -18,6 +18,14 @@ strip of **6 square frames** in this exact order (matching the `Face` type slice
 The dropdown in the header (`#spriteSet`, wired in `src/sprite-select.ts`) lets the player switch
 sets. A set may be **incomplete** — any missing piece falls back to procedural drawing, so you can
 add sheets one at a time.
+
+A set may also ship per-piece **action sheets** — `<PIECE>.actions.png`, same 768×128 six-frame
+format — used by the idle antics (blocks strolling / playing cards / play-fighting; see
+`src/antics.ts`). Their fixed pose order (matching `ActionPose` in `src/types.ts`):
+
+```
+[ walk-a, walk-b, cards, punch-a, punch-b, scurry ]
+```
 
 ## The one command you need
 
@@ -68,6 +76,47 @@ node scripts/gen-sprite-sheet.mjs animals-3d Z --no-generate --threshold 80
 - `--key auto|alpha|chroma` — background removal mode (default `auto`, detected from the corners).
 - `--threshold <0-255>` — alpha-key cutoff for `alpha` mode (default: auto from the alpha histogram).
 - `--frame <px>` / `--pad <0-1>` / `--model <id>` / `--keep-raw`.
+
+## Action sheets (`--actions`)
+
+```bash
+node scripts/gen-sprite-sheet.mjs blocks T --actions            # generate + validate + auto-retry
+node scripts/gen-sprite-sheet.mjs blocks T --actions --pose punch-b   # regenerate ONE pose
+node scripts/validate-sprite-frames.mjs blocks T --actions      # re-check without generating
+node scripts/gen-prop.mjs cards                                 # skin-independent prop sprite
+node scripts/preview-sheets.mjs blocks                          # contact sheet for eyeballing
+```
+
+How `--actions` differs from the expression pipeline:
+
+- **The base is the piece's existing calm frame** (frame 0 of `<piece>.png`) — the expression sheet
+  must exist first. Each pose is an image-to-image edit of it; `walk-b`/`punch-b` chain from their
+  `-a` sibling so pairs read as one motion. The prompt injects the calm frame's measured average
+  colour so the model doesn't drift the palette (it loves turning pale lavender into bold pink).
+- **Poses render on GREEN (#00FF00), not magenta** — pastel pink/lavender subjects sit too close to
+  magenta and get eaten by the chroma key. `keyImage` keys corner colour + magenta + green alike.
+- **Per-pose cache** in `.sprite-cache/frames/<set>/<piece>.actions/` — single poses can be redone
+  with `--pose <name>` without regenerating the rest. ⚠ `--frame <px>` is the frame SIZE flag; the
+  single-pose flag is `--pose`.
+- **Frame boundaries are exact** (we assemble the strip ourselves), so no column-profile detection.
+- **Bottom-anchored + scale-anchored**: subjects are baseline-aligned (feet don't jitter between
+  walk frames) and scale-normalized to the calm frame's subject height (no size pop when the
+  runtime swaps sheets).
+- **Validated automatically** (skip with `--no-validate`): geometric checks (coverage, bbox area vs
+  median, walk/punch pair area match, magenta residue, edge clipping) plus a **Gemini-vision
+  judge** per frame (pose correct? same character as the calm frame? artifacts?). Failing poses are
+  regenerated individually up to `--max-retries` (default 3); on exhaustion it prints the exact
+  `--pose` commands to retry manually.
+- Pose prompts can be overridden per set via a `"poses"` object in `set.json` (the mochi blobs are
+  limbless, so their walk is prompted as a squash-and-stretch hop).
+- **Colour fidelity is enforced in post, not in the prompt** — the model drifts each pose's palette
+  randomly (and asking for "exact colours" makes it worse). Each frame is re-tinted to the calm
+  frame's measured average (HSL modulate + per-channel linear gains), and magenta-ish pixels at the
+  alpha boundary are defringed. For subjects whose generations drift toward magenta (Z's pink),
+  tighten the chroma ramp with `--ramp "35,70"` so the key doesn't erode the body.
+
+The runtime falls back to expression frames + squash/flip transforms for any piece/skin without an
+action sheet, so sets can gain action art incrementally.
 
 ### Picking the mode
 

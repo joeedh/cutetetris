@@ -1,6 +1,6 @@
 import { TYPES } from './constants.ts';
 import { DEFAULT_SET_ID, spriteSet } from './sprite-sets.ts';
-import type { Face, PieceType } from './types.ts';
+import type { ActionPose, Face, PieceType } from './types.ts';
 
 /** Each block sheet is a horizontal strip of these expression frames, in this order. */
 const FACE_ORDER: Face[] = ['calm', 'blink', 'happy', 'worried', 'bicker', 'celebrate'];
@@ -16,8 +16,19 @@ const FACE_INDEX: Record<Face, number> = {
   none: 0,
 };
 
+/** Each `.actions.png` sheet is a horizontal strip of these poses, in this order. */
+const ACTION_INDEX: Record<ActionPose, number> = {
+  walkA: 0,
+  walkB: 1,
+  cards: 2,
+  punchA: 3,
+  punchB: 4,
+  scurry: 5,
+};
+
 /** Sliced frame canvases, keyed by set id then piece type. Populated lazily as sets load. */
 const frames: Record<string, Partial<Record<PieceType, HTMLCanvasElement[]>>> = {};
+const actionFrames: Record<string, Partial<Record<PieceType, HTMLCanvasElement[]>>> = {};
 const loaded = new Set<string>();
 let activeSetId = DEFAULT_SET_ID;
 
@@ -45,15 +56,26 @@ export function loadSpriteSet(id: string): void {
   if (!set) return;
   loaded.add(id);
   const store: Partial<Record<PieceType, HTMLCanvasElement[]>> = (frames[id] ??= {});
+  const actionStore: Partial<Record<PieceType, HTMLCanvasElement[]>> = (actionFrames[id] ??= {});
   for (const type of TYPES) {
     const src = set.sheets[type];
-    if (!src) continue;
-    const img = new Image();
-    img.onload = () => {
-      const sliced = sliceSheet(img);
-      if (sliced) store[type] = sliced;
-    };
-    img.src = src;
+    if (src) {
+      const img = new Image();
+      img.onload = () => {
+        const sliced = sliceSheet(img);
+        if (sliced) store[type] = sliced;
+      };
+      img.src = src;
+    }
+    const actionSrc = set.actions?.[type];
+    if (actionSrc) {
+      const img = new Image();
+      img.onload = () => {
+        const sliced = sliceSheet(img);
+        if (sliced) actionStore[type] = sliced;
+      };
+      img.src = actionSrc;
+    }
   }
 }
 
@@ -75,4 +97,14 @@ export function blockFrame(type: PieceType, face: Face): HTMLCanvasElement | nul
   const arr = frames[activeSetId]?.[type];
   if (!arr) return null;
   return arr[FACE_INDEX[face]] ?? arr[0] ?? null;
+}
+
+/**
+ * The action-pose frame for a piece in the active set, or `null` when the set ships no action
+ * sheet for it — callers then fall back to expression frames plus squash/flip transforms.
+ */
+export function actionFrame(type: PieceType, pose: ActionPose): HTMLCanvasElement | null {
+  const arr = actionFrames[activeSetId]?.[type];
+  if (!arr) return null;
+  return arr[ACTION_INDEX[pose]] ?? null;
 }

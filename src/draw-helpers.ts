@@ -1,5 +1,5 @@
 import { TYPE_BY_COLOR } from './constants.ts';
-import { blockFrame } from './sprites.ts';
+import { actionFrame, blockFrame } from './sprites.ts';
 import type { BlockOpts } from './types.ts';
 
 const WHITE: readonly [number, number, number] = [255, 255, 255];
@@ -91,7 +91,7 @@ export function drawBlock(
 ): void {
   const face = opts.face ?? 'calm';
   const alpha = opts.alpha ?? 1;
-  const sx = opts.scaleX ?? 1;
+  const sx = (opts.flipX ? -1 : 1) * (opts.scaleX ?? 1);
   const sy = opts.scaleY ?? 1;
   const glance = opts.glance ?? 0;
   const m = size * 0.07;
@@ -101,10 +101,12 @@ export function drawBlock(
   const cx = px + size / 2;
   const cy = py + size / 2;
 
-  // Prefer the watercolor sprite for this piece/expression; fall back to procedural drawing
-  // until the sheets finish loading (or if the color has no matching piece type).
+  // Prefer the watercolor sprite for this piece/pose or expression; fall back to procedural
+  // drawing until the sheets finish loading (or if the color has no matching piece type).
   const type = TYPE_BY_COLOR.get(color);
-  const frame = type ? blockFrame(type, face) : null;
+  const frame = type
+    ? (opts.pose ? actionFrame(type, opts.pose) : null) ?? blockFrame(type, face)
+    : null;
   if (frame) {
     c.save();
     c.globalAlpha = alpha;

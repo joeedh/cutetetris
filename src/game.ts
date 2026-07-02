@@ -10,6 +10,8 @@ import {
   rotate,
 } from './constants.ts';
 import { SevenBag } from './rng.ts';
+import { cancelAntics, emptyAntics, updateAntics } from './antics.ts';
+import type { AnticsState } from './antics.ts';
 import { addBickerFx, addPopup, burstHearts, initAmbient, spawnClearFx, updateFx } from './fx.ts';
 import type { AudioEngine } from './audio.ts';
 import type { Ui } from './ui.ts';
@@ -57,6 +59,7 @@ export class Game {
   particles: Particle[] = [];
   popups: Popup[] = [];
   ambient: Ambient[] = [];
+  antics: AnticsState = emptyAntics();
 
   blink: BlinkState = { next: performance.now() + 2500, until: 0 };
   glance: GlanceState = { dir: 0, next: performance.now() + 3000, until: 0 };
@@ -77,6 +80,7 @@ export class Game {
   /** Set up the idle attract screen (empty board, ambient hearts, a queued preview). */
   initIdle(): void {
     this.grid = emptyGrid();
+    cancelAntics(this);
     initAmbient(this);
     this.bag = new SevenBag();
     this.nextQueue = [this.bag.next(), this.bag.next(), this.bag.next()];
@@ -84,6 +88,7 @@ export class Game {
 
   newGame(): void {
     this.grid = emptyGrid();
+    cancelAntics(this);
     this.score = 0;
     this.lines = 0;
     this.level = 1;
@@ -230,6 +235,7 @@ export class Game {
 
   private lockPiece(): void {
     if (!this.current) return;
+    cancelAntics(this);
     const cur = this.current;
     const m = cur.matrix;
     const now = performance.now();
@@ -262,6 +268,7 @@ export class Game {
 
   private resolveClear(): void {
     if (!this.clearInfo) return;
+    cancelAntics(this);
     const rows = this.clearInfo.rows;
     const set = new Set(rows);
     const ng = emptyGrid();
@@ -425,6 +432,7 @@ export class Game {
         this.lockPiece();
       }
       this.updateBicker(time);
+      updateAntics(this, dt, time);
     } else if (this.status === 'clearing') {
       if (this.clearInfo && performance.now() - this.clearInfo.start >= CLEAR_DUR)
         this.resolveClear();

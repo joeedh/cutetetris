@@ -1,4 +1,5 @@
 import { CELL, CLEAR_DUR, COLORS, COLS, ROWS, SHAPES } from './constants.ts';
+import { anticsHiddenKeys, drawAntics } from './antics.ts';
 import { canvas, ctx2d } from './dom.ts';
 import { drawBlock, drawHeart, drawStar, rr } from './draw-helpers.ts';
 import type { Game } from './game.ts';
@@ -118,11 +119,13 @@ export class Renderer {
 
     const clearingSet = game.clearInfo ? new Set(game.clearInfo.rows) : null;
     const clearP = game.clearInfo ? Math.min(1, (now - game.clearInfo.start) / CLEAR_DUR) : 0;
+    const hidden = anticsHiddenKeys(game);
 
     for (let y = 0; y < ROWS; y++)
       for (let x = 0; x < COLS; x++) {
         const cell = game.grid[y][x];
         if (!cell) continue;
+        if (hidden?.has(y * COLS + x)) continue;
         if (clearingSet && clearingSet.has(y)) {
           const e = clearP;
           const hop = -Math.sin(Math.min(e * 1.6, 1) * Math.PI) * CELL * 0.5;
@@ -153,6 +156,9 @@ export class Renderer {
           });
         }
       }
+
+    // blocks that are out on an antic draw over the settled stack, under the falling piece
+    drawAntics(ctx, game);
 
     const cur = game.current;
     if (cur && (game.status === 'playing' || game.status === 'paused')) {

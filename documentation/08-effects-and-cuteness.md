@@ -6,11 +6,11 @@ one place.
 
 ## Three fx collections on `Game`
 
-| Collection | What it is | Spawned by | Updated by |
-| --- | --- | --- | --- |
+| Collection  | What it is                                                   | Spawned by                                                          | Updated by |
+| ----------- | ------------------------------------------------------------ | ------------------------------------------------------------------- | ---------- |
 | `particles` | stars / hearts / dots with velocity, gravity, spin, and life | clears, hard drop, game over, bicker, perfect clear, random twinkle | `updateFx` |
-| `popups` | floating text that rises and fades | clears, combo, level, perfect, bicker `💢` | `updateFx` |
-| `ambient` | slow background hearts that drift up and wrap around | `initAmbient` (idle & new game) | `updateFx` |
+| `popups`    | floating text that rises and fades                           | clears, combo, level, perfect, bicker `💢`                          | `updateFx` |
+| `ambient`   | slow background hearts that drift up and wrap around         | `initAmbient` (idle & new game)                                     | `updateFx` |
 
 `updateFx(game)` runs every frame (from `tick`, regardless of status): it integrates each particle
 (position, gravity, spin, life; culled at life ≤ 0), rises/fades popups, drifts ambient hearts and
@@ -31,7 +31,7 @@ wraps them at the top, and — unless reduced motion — occasionally spawns a w
 ## Block expressions
 
 Each mochi block shows a `Face`: `calm | happy | blink | worried | bicker | celebrate | none`.
-Most are chosen *at render time* by the `Renderer` (blink schedule, glance, danger → worried), but
+Most are chosen _at render time_ by the `Renderer` (blink schedule, glance, danger → worried), but
 two are **stateful**, stored on the cell as `expr` + `exprUntil` and honored until they expire:
 
 - **`celebrate`** — set on all surviving cells for ~1.3 s after a line clear (in `resolveClear`);
@@ -45,6 +45,35 @@ Occasionally two horizontally-neighbouring settled blocks squabble: both get the
 scales with how tall the stack is (`stackHeight`): roughly one spat every ~7 s on an empty-ish
 board, down to sub-second when stacked high — so a dangerous board feels tense and chattery. The
 renderer adds a horizontal jitter to bickering faces.
+
+## Idle antics (`antics.ts`)
+
+Settled blocks that have sat for `ANTICS_DELAY` (5 s) may sneak out of their cells for a little
+activity — **purely cosmetic**: the grid never changes, only where blocks are _drawn_. One activity
+runs at a time, scheduled from `Game.tick` (playing only) with a randomized cooldown between
+activities; candidates are **surface cells** (nothing above them), and nothing starts while
+`dangerNow`.
+
+- **stroll** — a lone block hops out and wanders 1–3 cells along a flat shelf beside its home,
+  pauses, and ambles back.
+- **cards** — 2–3 neighbours hop up onto the stack and sit in a circle around a little fanned-cards
+  prop (`props.ts`, procedural stand-in until it loads); every few seconds one hops with a gold
+  "good hand!" star.
+- **fight** — two blocks climb into an empty row and alternate chase and bump beats (punch poses,
+  `💢` popup, red sparks, a `bicker` clip) — the bicker gag upgraded to physical comedy.
+
+**Scurry:** every frame the participants are checked against the falling piece _and its ghost
+landing footprint_; within `ANTICS_SCURRY_RADIUS` (2.5 cells, Chebyshev) the whole group dashes
+home at `ANTICS_SCURRY_SPEED` with worried faces, then blinks a little "phew".
+
+**Interruption:** `cancelAntics` snaps everyone home instantly at the top of `lockPiece` and
+`resolveClear` (the grid only mutates there, so geometry checked at activity start stays valid for
+the activity's whole life), plus `newGame`/`initIdle`. All timers are dt-accumulated, so pause just
+freezes the tableau. A per-frame identity tripwire (`grid[homeY][homeX] === cell`) guards against
+any future mutation path. Poses come from the optional **action sheets** (see
+[07 — Sprites & skins](07-sprites-and-skins.md)); with none loaded, walk/punch/scurry fall back to
+squash-stretch/flip transforms on the expression frames. `reduceMotion` disables antics entirely,
+and `?antics=<ms>` shortens the delay for testing.
 
 ## Mascot moods
 

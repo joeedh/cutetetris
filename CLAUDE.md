@@ -71,6 +71,9 @@ State and rendering are separated; everything is wired together in `main.ts`. Se
 - `renderer.ts` — **`Renderer`** class holds the 3 canvas contexts; reads a `Game` each frame to
   draw the board, next-piece preview, and mascot. Stateless w.r.t. game logic.
 - `fx.ts` — particle/popup/ambient spawning + per-frame update; functions that operate on a `Game`.
+- `antics.ts` — the **idle antics**: settled blocks stroll/play cards/play-fight after sitting 5s,
+  and scurry home when the falling piece nears. Purely cosmetic (grid untouched); cancelled on any
+  lock/clear. `props.ts` — small prop sprites for the antics (the fanned cards).
 - `audio.ts` — **`AudioEngine`**: Web Audio synthesis (`sfx(name)`, no files) + pitched-up sampled
   voice clips (`playClip`) from `assets/sfx/*.ogg`; mute.
 - `ui.ts` — **`Ui`**: the DOM that reflects state (stat readouts, overlay, pause icon).

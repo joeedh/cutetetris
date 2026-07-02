@@ -8,6 +8,11 @@ import blocksZ from './assets/blocks/blocks/Z.png';
 import blocksJ from './assets/blocks/blocks/J.png';
 import blocksL from './assets/blocks/blocks/L.png';
 
+import blocksIActions from './assets/blocks/blocks/I.actions.png';
+import blocksTActions from './assets/blocks/blocks/T.actions.png';
+import blocksSActions from './assets/blocks/blocks/S.actions.png';
+import blocksJActions from './assets/blocks/blocks/J.actions.png';
+
 import animalsI from './assets/blocks/animals-3d/I.png';
 import animalsO from './assets/blocks/animals-3d/O.png';
 import animalsT from './assets/blocks/animals-3d/T.png';
@@ -25,6 +30,11 @@ export interface SpriteSet {
    * drawing (see `draw-helpers.ts`), so partially-finished sets still work.
    */
   readonly sheets: Partial<Record<PieceType, string>>;
+  /**
+   * Per-piece action-pose sheet URL (`<PIECE>.actions.png`), used by the idle antics. Optional —
+   * a set without action sheets falls back to expression frames plus squash/flip transforms.
+   */
+  readonly actions?: Partial<Record<PieceType, string>>;
 }
 
 /** All available skins. The first entry is the default. `id` matches the directory under `assets/blocks/`. */
@@ -33,6 +43,15 @@ export const SPRITE_SETS: readonly SpriteSet[] = [
     id: 'blocks',
     label: 'Mochi',
     sheets: { I: blocksI, O: blocksO, T: blocksT, S: blocksS, Z: blocksZ, J: blocksJ, L: blocksL },
+    // O, Z, and L have no action sheets yet — their pink/cream palettes keep colliding with the
+    // chroma key (bodies come out eroded); they fall back to expression frames + transforms.
+    // Regenerate with `gen-sprite-sheet.mjs blocks <piece> --actions --ramp "35,70"`.
+    actions: {
+      I: blocksIActions,
+      T: blocksTActions,
+      S: blocksSActions,
+      J: blocksJActions,
+    },
   },
   {
     id: 'animals-3d',

@@ -7,6 +7,15 @@ export const CELL = 30;
 export const LOCK_DELAY = 480;
 export const CLEAR_DUR = 460;
 
+// idle antics — purely cosmetic block activities (see antics.ts)
+export const ANTICS_DELAY = 5000; // ms settled before a block may join an antic
+export const ANTICS_SCURRY_RADIUS = 2.5; // cells (Chebyshev) from the piece/ghost that spooks them
+export const ANTICS_WALK_SPEED = 0.055; // px per ms (~1.8 cells/s)
+export const ANTICS_SCURRY_SPEED = 0.28; // px per ms — home in ~250-400ms
+export const ANTICS_GAP_MIN = 6000; // ms between activities
+export const ANTICS_GAP_MAX = 14000;
+export const ANTICS_MAX_GROUP = 3;
+
 export const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export const COLORS: Record<PieceType, string> = {

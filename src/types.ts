@@ -25,6 +25,9 @@ export type Grid = (Cell | null)[][];
 /** Expression drawn on a mochi block. */
 export type Face = 'calm' | 'happy' | 'blink' | 'worried' | 'bicker' | 'celebrate' | 'none';
 
+/** Action pose from a block's `.actions.png` sheet, used by the idle-antics animations. */
+export type ActionPose = 'walkA' | 'walkB' | 'cards' | 'punchA' | 'punchB' | 'scurry';
+
 /** Expression drawn on the rabbit mascot. */
 export type Mood = 'idle' | 'sleep' | 'sad' | 'cheer' | 'worried';
 
@@ -89,4 +92,8 @@ export interface BlockOpts {
   scaleX?: number;
   scaleY?: number;
   glance?: number;
+  /** Mirror the block horizontally (a block walking left is a flipped walking-right frame). */
+  flipX?: boolean;
+  /** Prefer this action-sheet pose over `face`; falls back to `face` when the frame is missing. */
+  pose?: ActionPose;
 }
